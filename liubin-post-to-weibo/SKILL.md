@@ -1,80 +1,83 @@
 ---
 name: liubin-post-to-weibo
-description: Post content to Weibo (微博). Supports text posts with images. Uses real Chrome with CDP to bypass anti-automation.
+description: Post content to Weibo. Supports text posts with up to 9 images or a single video, using real Chrome with CDP automation.
 ---
 
-# Post to Weibo (发微博)
+# Post to Weibo
 
-Post content and images to Weibo using real Chrome browser (bypasses anti-bot detection).
+Post content to Weibo through the real web UI in Chrome.
 
 ## Script Directory
 
-**Important**: All scripts are located in the `scripts/` subdirectory of this skill.
+All scripts are under `scripts/`.
 
-**Agent Execution Instructions**:
-1. Determine this SKILL.md file's directory path as `SKILL_DIR`
-2. Script path = `${SKILL_DIR}/scripts/<script-name>.ts`
-3. Replace all `${SKILL_DIR}` in this document with the actual path
+Agent execution steps:
+1. Resolve this file's directory as `SKILL_DIR`
+2. Use `${SKILL_DIR}/scripts/<script-name>.ts` for script paths
+3. Replace `${SKILL_DIR}` with the actual absolute path at runtime
 
-**Script Reference**:
+Script reference:
 | Script | Purpose |
 |--------|---------|
-| `scripts/weibo-browser.ts` | Regular posts (text + images) |
-| `scripts/copy-to-clipboard.ts` | Copy content to clipboard |
-| `scripts/paste-from-clipboard.ts` | Send real paste keystroke |
+| `scripts/weibo-browser.ts` | Compose and publish text, image, or video posts |
+| `scripts/copy-to-clipboard.ts` | Clipboard helper kept for compatibility |
+| `scripts/paste-from-clipboard.ts` | Paste helper kept for compatibility |
 
 ## Prerequisites
 
 - Google Chrome or Chromium installed
-- `bun` installed (for running scripts)
-- First run: log in to Weibo in the opened browser window
-
----
+- `bun` installed
+- First run requires manual login in the opened Weibo browser window
 
 ## Regular Posts
 
-Text + up to 9 images.
+Supports:
+- text only
+- text + up to 9 images
+- text + 1 video
 
 ```bash
-# Preview mode (doesn't post)
+# Preview mode
 npx -y bun ${SKILL_DIR}/scripts/weibo-browser.ts "Hello from Claude!"
 
-# With images
-npx -y bun ${SKILL_DIR}/scripts/weibo-browser.ts "Check this out!" --image ./photo.png
+# One image
+npx -y bun ${SKILL_DIR}/scripts/weibo-browser.ts "Check this out" --image ./photo.png
 
-# Multiple images (max 9)
+# Multiple images
 npx -y bun ${SKILL_DIR}/scripts/weibo-browser.ts "Photos" --image a.png --image b.png --image c.png
 
+# One video
+npx -y bun ${SKILL_DIR}/scripts/weibo-browser.ts "Video post" --video ./clip.mp4
+
+# Private-only video post
+npx -y bun ${SKILL_DIR}/scripts/weibo-browser.ts "Private video" --video ./clip.mp4 --private
+
 # Actually post
-npx -y bun ${SKILL_DIR}/scripts/weibo-browser.ts "发布微博!" --image ./photo.png --submit
+npx -y bun ${SKILL_DIR}/scripts/weibo-browser.ts "Publish now" --image ./photo.png --submit
 ```
 
-> **Note**: `${SKILL_DIR}` represents this skill's installation directory. Agent replaces with actual path at runtime.
+## Parameters
 
-**Parameters**:
 | Parameter | Description |
 |-----------|-------------|
-| `<text>` | Post content (positional argument) |
-| `--image <path>` | Image file path (can be repeated, max 9) |
-| `--submit` | Actually post (default: preview only) |
+| `<text>` | Post content |
+| `--image <path>` | Image path, repeatable, max 9 |
+| `--video <path>` | Video path, single file only |
+| `--submit` | Actually publish instead of preview |
+| `--private` | Set visibility to private only |
 | `--profile <dir>` | Custom Chrome profile directory |
-
----
 
 ## Notes
 
-- First run requires manual login (session is saved)
-- Always preview before using `--submit`
-- Browser closes automatically after operation
+- Always preview before `--submit` when possible
+- Do not mix `--image` and `--video` in one post
+- Browser closes automatically after the run
 - Supports macOS, Linux, and Windows
-- Weibo has a 2000 character limit for regular posts
 
 ## Extension Support
 
-Custom configurations via EXTEND.md.
+Optional overrides may be provided in:
+1. `.liubin-skills/liubin-post-to-weibo/EXTEND.md`
+2. `~/.liubin-skills/liubin-post-to-weibo/EXTEND.md`
 
-**Check paths** (priority order):
-1. `.liubin-skills/liubin-post-to-weibo/EXTEND.md` (project)
-2. `~/.liubin-skills/liubin-post-to-weibo/EXTEND.md` (user)
-
-If found, load before workflow. Extension content overrides defaults.
+If present, load the extension content before following the workflow.

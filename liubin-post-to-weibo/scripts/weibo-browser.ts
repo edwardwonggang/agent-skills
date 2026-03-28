@@ -206,6 +206,7 @@ class CdpConnection {
 interface WeiboBrowserOptions {
   text?: string;
   images?: string[];
+  videos?: string[];
   submit?: boolean;
   privateOnly?: boolean;
   timeoutMs?: number;
@@ -214,7 +215,7 @@ interface WeiboBrowserOptions {
 }
 
 export async function postToWeibo(options: WeiboBrowserOptions): Promise<void> {
-  const { text: rawText, images = [], submit = false, privateOnly = false, timeoutMs = 120_000, profileDir = getDefaultProfileDir() } = options;
+  const { text: rawText, images = [], videos = [], submit = false, privateOnly = false, timeoutMs = 120_000, profileDir = getDefaultProfileDir() } = options;
 
   // Append AI signature to the text
   const text = rawText ? rawText + AI_SIGNATURE : undefined;
@@ -557,6 +558,89 @@ export async function postToWeibo(options: WeiboBrowserOptions): Promise<void> {
       }
     }
 
+    if (videos.length > 0) {
+      const existingVideos = videos
+        .map((videoPath) => path.resolve(videoPath))
+        .filter((videoPath) => {
+          if (fs.existsSync(videoPath)) return true;
+          console.warn(`[weibo-browser] Video not found: ${videoPath}`);
+          return false;
+        });
+
+      if (existingVideos.length > 0) {
+        console.log('[weibo-browser] Uploading video via shared file input...');
+
+        const waitForFileInput = async (): Promise<number> => {
+          const start = Date.now();
+          while (Date.now() - start < timeoutMs) {
+            const { root } = await cdp!.send<{ root: { nodeId: number } }>('DOM.getDocument', {
+              depth: 1,
+              pierce: true,
+            }, { sessionId });
+            const result = await cdp!.send<{ nodeId: number }>('DOM.querySelector', {
+              nodeId: root.nodeId,
+              selector: 'input[type="file"]',
+            }, { sessionId });
+            if (result.nodeId > 0) return result.nodeId;
+            await sleep(500);
+          }
+          throw new Error('Timed out waiting for Weibo video file input.');
+        };
+
+        const waitForVideoAttachment = async (): Promise<{ attachments: number; videos: number }> => {
+          const start = Date.now();
+          while (Date.now() - start < timeoutMs) {
+            const result = await cdp!.send<{ result: { value?: { attachments?: number; videos?: number } } }>('Runtime.evaluate', {
+              expression: `
+                (() => {
+                  const publishCard = document.querySelector('[class*="publishCard"]') || document.querySelector('#homeWrap');
+                  if (!publishCard) return { attachments: 0, videos: 0 };
+                  return {
+                    attachments: publishCard.querySelectorAll('[title="\\u5220\\u9664"], [class*="_close_"]').length,
+                    videos: publishCard.querySelectorAll('video').length,
+                  };
+                })()
+              `,
+              returnByValue: true,
+            }, { sessionId });
+
+            const attachments = result.result.value?.attachments ?? 0;
+            const videoCount = result.result.value?.videos ?? 0;
+            if (attachments >= 1 || videoCount >= 1) {
+              return { attachments, videos: videoCount };
+            }
+            await sleep(500);
+          }
+          return { attachments: 0, videos: 0 };
+        };
+
+        const fileInputNodeId = await waitForFileInput();
+
+        await cdp.send('DOM.setFileInputFiles', {
+          nodeId: fileInputNodeId,
+          files: existingVideos,
+        }, { sessionId, timeoutMs: 30_000 });
+
+        await cdp.send('Runtime.evaluate', {
+          expression: `
+            (() => {
+              const input = document.querySelector('input[type="file"]');
+              if (!input) return false;
+              input.dispatchEvent(new Event('input', { bubbles: true }));
+              input.dispatchEvent(new Event('change', { bubbles: true }));
+              return true;
+            })()
+          `,
+          returnByValue: true,
+        }, { sessionId });
+
+        const uploadState = await waitForVideoAttachment();
+        console.log(`[weibo-browser] Weibo accepted video attachment (attachments=${uploadState.attachments}, videos=${uploadState.videos}).`);
+        console.log('[weibo-browser] Waiting for video upload...');
+        await sleep(10_000);
+      }
+    }
+
     if (false) {
     // Handle image uploads
     for (const imagePath of images) {
@@ -696,6 +780,7 @@ Usage:
 
 Options:
   --image <path>   Add image (can be repeated, max 9)
+  --video <path>   Add a single video
   --submit         Actually post (default: preview only)
   --private        Set visibility to private (only me)
   --profile <dir>  Chrome profile directory
@@ -704,6 +789,7 @@ Options:
 Examples:
   npx -y bun weibo-browser.ts "Hello from CLI!"
   npx -y bun weibo-browser.ts "Check this out" --image ./screenshot.png
+  npx -y bun weibo-browser.ts "Video post" --video ./clip.mp4 --private
   npx -y bun weibo-browser.ts "Private album" --image a.png --image b.png --private
   npx -y bun weibo-browser.ts "发布微博!" --image a.png --image b.png --submit
 `);
@@ -715,6 +801,7 @@ async function main(): Promise<void> {
   if (args.includes('--help') || args.includes('-h')) printUsage();
 
   const images: string[] = [];
+  const videos: string[] = [];
   let submit = false;
   let privateOnly = false;
   let profileDir: string | undefined;
@@ -724,6 +811,8 @@ async function main(): Promise<void> {
     const arg = args[i]!;
     if (arg === '--image' && args[i + 1]) {
       images.push(args[++i]!);
+    } else if (arg === '--video' && args[i + 1]) {
+      videos.push(args[++i]!);
     } else if (arg === '--submit') {
       submit = true;
     } else if (arg === '--private') {
@@ -737,8 +826,8 @@ async function main(): Promise<void> {
 
   const text = textParts.join(' ').trim() || undefined;
 
-  if (!text && images.length === 0) {
-    console.error('Error: Provide text or at least one image.');
+  if (!text && images.length === 0 && videos.length === 0) {
+    console.error('Error: Provide text, at least one image, or one video.');
     process.exit(1);
   }
 
@@ -747,7 +836,17 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  await postToWeibo({ text, images, submit, privateOnly, profileDir });
+  if (videos.length > 1) {
+    console.error('Error: Weibo supports at most 1 video per post.');
+    process.exit(1);
+  }
+
+  if (images.length > 0 && videos.length > 0) {
+    console.error('Error: Mixing images and video in one post is not supported by this skill.');
+    process.exit(1);
+  }
+
+  await postToWeibo({ text, images, videos, submit, privateOnly, profileDir });
 }
 
 await main().catch((err) => {

@@ -4,7 +4,7 @@ Reusable agent skills for Claude Code, Cursor, and other agents supported by the
 
 ## Included Skills
 
-- `liubin-post-to-weibo`: Post text and up to 9 images to Weibo through the real web UI in Chrome. Supports preview mode, publish mode, and private-only visibility.
+- `liubin-post-to-weibo`: Post text and up to 9 images, or a single video, to Weibo through the real web UI in Chrome. Supports preview mode, publish mode, and private-only visibility.
 
 ## Install
 
