@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{REPORT_TITLE}} · 问题定位报告</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<style>
+  :root{
+    --navy:#294066; --ok:#276749; --warn:#8a5a12; --risk:#9b342a;
+    --muted:#5c6672; --ink:#1b2733; --line:#e4e2db; --bg:#f6f7f9; --card:#ffffff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--bg);line-height:1.65}
+  .layout{display:flex;max-width:1280px;margin:0 auto}
+  /* 左侧目录 */
+  .toc{position:sticky;top:0;height:100vh;width:240px;flex:0 0 240px;background:var(--navy);color:#fff;padding:24px 20px;overflow-y:auto}
+  .toc h1{font-size:16px;margin:0 0 4px;line-height:1.4}
+  .toc .toc-sub{font-size:12px;color:#c7d0de;margin-bottom:20px}
+  .toc a{display:block;color:#dbe2ec;text-decoration:none;padding:6px 8px;border-radius:6px;font-size:13px;margin-bottom:2px}
+  .toc a:hover{background:rgba(255,255,255,.12);color:#fff}
+  .toc a.active{background:var(--ok);color:#fff}
+  .main{flex:1;padding:32px 40px 80px;min-width:0}
+  /* 核心结论卡片 */
+  .tldr{background:var(--card);border-left:6px solid var(--navy);border-radius:10px;padding:20px 24px;margin-bottom:28px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+  .tldr h2{margin:0 0 12px;font-size:18px}
+  .tldr-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+  .tldr-item{border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+  .tldr-item .k{font-size:12px;color:var(--muted)}
+  .tldr-item .v{font-size:15px;font-weight:600;margin-top:2px}
+  .tldr-item .v.ok{color:var(--ok)} .tldr-item .v.warn{color:var(--warn)} .tldr-item .v.risk{color:var(--risk)} .tldr-item .v.navy{color:var(--navy)}
+  /* 章节 */
+  section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:22px 26px;margin-bottom:22px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  section h2.sec{display:flex;align-items:center;gap:10px;margin:0 0 16px;font-size:19px;border-bottom:2px solid var(--line);padding-bottom:10px}
+  section h2.sec .no{background:var(--navy);color:#fff;border-radius:6px;padding:2px 9px;font-size:14px}
+  section h3{margin:20px 0 8px;font-size:16px;color:var(--navy)}
+  p{margin:8px 0}
+  /* 状态/标签 */
+  .tag{display:inline-block;padding:2px 9px;border-radius:12px;font-size:12px;font-weight:600;margin-right:6px}
+  .tag.ok{background:#e3f2e9;color:var(--ok)} .tag.warn{background:#f7ecd9;color:var(--warn)}
+  .tag.risk{background:#f6e3e1;color:var(--risk)} .tag.navy{background:#e5eaf3;color:var(--navy)} .tag.muted{background:#eef0f3;color:var(--muted)}
+  /* ===== 对齐总原则 =====
+     图类组件（Mermaid/PlantUML 图、ECharts 图、截图/图片）水平居中；
+     文本/数据类组件（时间线、表格、代码块/日志、提示块）保持左对齐。
+     居中只是"图"的美观需要，文本左对齐才利于阅读。 */
+  /* 图表容器 */
+  .chart{width:100%;height:340px;margin:14px auto}
+  /* Mermaid/PlantUML 流程图：水平居中（Mermaid/PlantUML 默认左对齐，必须显式居中） */
+  pre.mermaid{text-align:center;background:transparent;margin:14px 0}
+  pre.mermaid svg{display:block;margin:0 auto;max-width:100%;height:auto}
+  pre.plantuml{text-align:center;background:transparent;margin:14px 0}
+  pre.plantuml svg{display:block;margin:0 auto;max-width:100%;height:auto}
+  .fig-caption{font-size:12px;color:var(--muted);text-align:center;margin:6px 0 16px}
+  /* 折叠 */
+  details{border:1px solid var(--line);border-radius:8px;margin:12px 0;background:#fbfcfd}
+  details summary{cursor:pointer;padding:10px 14px;font-weight:600;color:var(--navy);font-size:14px}
+  details pre{background:#0f1720;color:#d8e0ea;padding:14px 16px;border-radius:0 0 8px 8px;overflow-x:auto;font-size:12.5px;margin:0;white-space:pre-wrap;word-break:break-word}
+  /* 表格 */
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:left}
+  th{background:var(--bg);color:var(--navy);font-weight:600}
+  /* 时间线 */
+  .timeline{position:relative;margin:16px 0;padding-left:26px}
+  .timeline::before{content:"";position:absolute;left:8px;top:4px;bottom:4px;width:2px;background:var(--line)}
+  .tl-item{position:relative;margin-bottom:16px}
+  .tl-item::before{content:"";position:absolute;left:-26px;top:5px;width:10px;height:10px;border-radius:50%;background:var(--navy);border:2px solid #fff;box-shadow:0 0 0 2px var(--navy)}
+  .tl-item.warn::before{background:var(--warn);box-shadow:0 0 0 2px var(--warn)}
+  .tl-item.risk::before{background:var(--risk);box-shadow:0 0 0 2px var(--risk)}
+  .tl-time{font-size:12px;color:var(--muted);font-weight:600}
+  .tl-title{font-weight:600;margin:1px 0 2px}
+  /* 调用链/证据行 */
+  .chain{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:12px 16px;font-size:13px;overflow-x:auto;white-space:pre-wrap}
+  .call{color:var(--navy);font-weight:600}
+  .err{color:var(--risk);font-weight:600}
+  /* 提示/风险块 */
+  .note{border-left:4px solid var(--warn);background:#fdf9ef;padding:10px 14px;border-radius:6px;margin:12px 0;font-size:14px}
+  .risk-block{border-left:4px solid var(--risk);background:#fdf3f2;padding:10px 14px;border-radius:6px;margin:12px 0;font-size:14px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:900px){.layout{flex-direction:column}.toc{position:static;height:auto;width:100%;flex:1 1 auto}.main{padding:20px}.grid2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav class="toc">
+    <h1>{{REPORT_TITLE}}</h1>
+    <div class="toc-sub">{{REPORT_DATE}} · {{REPORT_TYPE}}</div>
+    <a href="#sec-1">01 · 结论</a>
+    <a href="#sec-2">02 · 现象</a>
+    <a href="#sec-3">03 · 复现步骤</a>
+    <a href="#sec-4">04 · 证据链</a>
+    <a href="#sec-5">05 · 根因分析</a>
+    <a href="#sec-6">06 · 影响范围</a>
+    <a href="#sec-7">07 · 修复方案</a>
+    <a href="#sec-8">08 · 遗留问题</a>
+  </nav>
+  <main class="main">
+
+    <!-- triage 注释：逐项判定 5 个图族 use/skip + 理由 -->
+    <!-- triage: 1flow=use(...); 2dataviz=use(...); 3graph=use(...); 4timeline=use(...); 5img=use(...) -->
+
+<section id="sec-1">
+      <h2 class="sec"><span class="no">01</span>核心结论</h2>
+      <div class="tldr-grid">
+        <div class="tldr-item"><div class="k">问题一句话</div><div class="v navy">{{TLDR_SUMMARY}}</div></div>
+        <div class="tldr-item"><div class="k">影响范围</div><div class="v warn">{{TLDR_IMPACT}}</div></div>
+        <div class="tldr-item"><div class="k">根因</div><div class="v">{{TLDR_ROOTCAUSE}}</div></div>
+        <div class="tldr-item"><div class="k">状态</div><div class="v {{STATUS_CLASS}}">{{STATUS}}</div></div>
+        <div class="tldr-item"><div class="k">建议动作</div><div class="v navy">{{TLDR_ACTION}}</div></div>
+      </div>
+    </section>
+
+<section id="sec-2">
+      <h2 class="sec"><span class="no">02</span>现象描述</h2>
+      <p>{{PHENOMENON_TEXT}}</p>
+      <!-- 截图/证据图片 -->
+      <img src="{{SCREENSHOT}}" alt="现象截图" style="display:block;max-width:100%;height:auto;border:1px solid var(--line);border-radius:8px;margin:12px auto">
+      <div class="fig-caption">图：现象/报错截图</div>
+    </section>
+
+<section id="sec-3">
+      <h2 class="sec"><span class="no">03</span>复现步骤</h2>
+      <ol>
+        <li>{{REPRO_STEP_1}}</li>
+        <li>{{REPRO_STEP_2}}</li>
+        <li>{{REPRO_STEP_3}}</li>
+      </ol>
+      <!-- 流程/时序图 -->
+      <pre class="mermaid">
+{{FLOW_MERMAID}}
+      </pre>
+      <div class="fig-caption">图：复现/请求流程</div>
+    </section>
+
+<section id="sec-4">
+      <h2 class="sec"><span class="no">04</span>证据链</h2>
+      <p>{{EVIDENCE_TEXT}}</p>
+      <!-- 数据动态图 -->
+      <div id="chart1" class="chart"></div>
+      <div class="fig-caption">图：关键指标时序曲线（可缩放/悬停/动态）</div>
+      <details>
+        <summary>展开查看原始日志 / 调用链</summary>
+<pre>{{EVIDENCE_LOG}}</pre>
+      </details>
+    </section>
+
+<section id="sec-5">
+      <h2 class="sec"><span class="no">05</span>根因分析</h2>
+      <p>{{ROOTCAUSE_TEXT}}</p>
+      <h3>定位路径</h3>
+      <div class="chain">{{ROOTCAUSE_CHAIN}}</div>
+      <div class="note">直接原因：{{DIRECT_CAUSE}}</div>
+      <div class="risk-block">深层原因：{{DEEP_CAUSE}}</div>
+    </section>
+
+<section id="sec-6">
+      <h2 class="sec"><span class="no">06</span>影响范围</h2>
+      <p>{{IMPACT_TEXT}}</p>
+      <!-- 关系/拓扑图 -->
+      <pre class="mermaid">
+{{GRAPH_MERMAID}}
+      </pre>
+      <div class="fig-caption">图：受影响模块拓扑/依赖关系</div>
+    </section>
+
+<section id="sec-7">
+      <h2 class="sec"><span class="no">07</span>修复方案</h2>
+      <p>{{FIX_TEXT}}</p>
+      <!-- 修复流程 -->
+      <pre class="mermaid">
+{{FIX_FLOW_MERMAID}}
+      </pre>
+      <div class="fig-caption">图：修复与验证流程</div>
+    </section>
+
+<section id="sec-8">
+      <h2 class="sec"><span class="no">08</span>遗留问题 / 下一步</h2>
+      <ul>
+        <li>{{OPEN_ITEM_1}}</li>
+        <li>{{OPEN_ITEM_2}}</li>
+      </ul>
+    </section>
+
+  </main>
+</div>
+
+<script>
+  // 初始化 Mermaid
+  mermaid.initialize({startOnLoad:true, theme:'base', securityLevel:'loose',
+    themeVariables:{primaryColor:'#e5eaf3', primaryBorderColor:'#294066', primaryTextColor:'#1b2733',
+      lineColor:'#5c6672', edgeLabelBackground:'#ffffff'}});
+
+  // 图表数据占位，替换为真实数据
+  const CHART_DATA = {{CHART_DATA_JSON}};
+  function initCharts(){
+    var el = document.getElementById('chart1');
+    if(!el) return;
+    var chart = echarts.init(el);
+    chart.setOption({
+      tooltip:{trigger:'axis'},
+      legend:{data:CHART_DATA.legend},
+      grid:{left:50,right:30,top:40,bottom:40},
+      xAxis:{type:'category', data:CHART_DATA.x},
+      yAxis:{type:'value'},
+      series: CHART_DATA.legend.map(function(name,i){
+        return {name:name, type:'line', smooth:true, data:CHART_DATA.series[i],
+                areaStyle:i===0?{opacity:.15}:undefined, itemStyle:{color:['#294066','#8a5a12','#9b342a','#276749'][i%4]}};
+      })
+    });
+    window.addEventListener('resize', function(){chart.resize();});
+  }
+  if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',initCharts);}else{initCharts();}
+</script>
+</body>
+</html>

@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TokenFlux 中转站模型请求偶发超时 · 问题定位报告</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<style>
+  :root{
+    --navy:#294066; --ok:#276749; --warn:#8a5a12; --risk:#9b342a;
+    --muted:#5c6672; --ink:#1b2733; --line:#e4e2db; --bg:#f6f7f9; --card:#ffffff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--bg);line-height:1.65}
+  .layout{display:flex;max-width:1280px;margin:0 auto}
+  .toc{position:sticky;top:0;height:100vh;width:250px;flex:0 0 250px;background:var(--navy);color:#fff;padding:24px 20px;overflow-y:auto}
+  .toc h1{font-size:15px;margin:0 0 4px;line-height:1.4}
+  .toc .toc-sub{font-size:12px;color:#c7d0de;margin-bottom:20px}
+  .toc a{display:block;color:#dbe2ec;text-decoration:none;padding:6px 8px;border-radius:6px;font-size:13px;margin-bottom:2px}
+  .toc a:hover{background:rgba(255,255,255,.12);color:#fff}
+  .toc .grp{font-size:11px;color:#8fa1ba;margin:14px 0 4px;font-weight:600}
+  .main{flex:1;padding:32px 40px 80px;min-width:0}
+  .tldr{background:var(--card);border-left:6px solid var(--navy);border-radius:10px;padding:20px 24px;margin-bottom:28px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+  .tldr h2{margin:0 0 12px;font-size:18px}
+  .tldr-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+  .tldr-item{border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+  .tldr-item .k{font-size:12px;color:var(--muted)}
+  .tldr-item .v{font-size:15px;font-weight:600;margin-top:2px}
+  .tldr-item .v.ok{color:var(--ok)} .tldr-item .v.warn{color:var(--warn)} .tldr-item .v.risk{color:var(--risk)} .tldr-item .v.navy{color:var(--navy)}
+  section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:22px 26px;margin-bottom:22px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  section h2.sec{display:flex;align-items:center;gap:10px;margin:0 0 16px;font-size:19px;border-bottom:2px solid var(--line);padding-bottom:10px}
+  section h2.sec .no{background:var(--navy);color:#fff;border-radius:6px;padding:2px 9px;font-size:14px}
+  section h3{margin:20px 0 8px;font-size:16px;color:var(--navy)}
+  p{margin:8px 0}
+  .tag{display:inline-block;padding:2px 9px;border-radius:12px;font-size:12px;font-weight:600;margin-right:6px}
+  .tag.ok{background:#e3f2e9;color:var(--ok)} .tag.warn{background:#f7ecd9;color:var(--warn)}
+  .tag.risk{background:#f6e3e1;color:var(--risk)} .tag.navy{background:#e5eaf3;color:var(--navy)} .tag.muted{background:#eef0f3;color:var(--muted)}
+  .chart{width:100%;height:340px;margin:14px auto}
+  .chart.tall{height:380px}
+  /* Mermaid/PlantUML 流程图：水平居中（默认左对齐，必须显式居中） */
+  pre.mermaid{text-align:center;background:transparent;margin:14px 0}
+  pre.mermaid svg{display:block;margin:0 auto;max-width:100%;height:auto}
+  .fig-caption{font-size:12px;color:var(--muted);text-align:center;margin:6px 0 16px}
+  details{border:1px solid var(--line);border-radius:8px;margin:12px 0;background:#fbfcfd}
+  details summary{cursor:pointer;padding:10px 14px;font-weight:600;color:var(--navy);font-size:14px}
+  details pre{background:#0f1720;color:#d8e0ea;padding:14px 16px;border-radius:0 0 8px 8px;overflow-x:auto;font-size:12.5px;margin:0;white-space:pre-wrap;word-break:break-word}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:left}
+  th{background:var(--bg);color:var(--navy);font-weight:600}
+  .timeline{position:relative;margin:16px 0;padding-left:26px}
+  .timeline::before{content:"";position:absolute;left:8px;top:4px;bottom:4px;width:2px;background:var(--line)}
+  .tl-item{position:relative;margin-bottom:16px}
+  .tl-item::before{content:"";position:absolute;left:-26px;top:5px;width:10px;height:10px;border-radius:50%;background:var(--navy);border:2px solid #fff;box-shadow:0 0 0 2px var(--navy)}
+  .tl-item.warn::before{background:var(--warn);box-shadow:0 0 0 2px var(--warn)}
+  .tl-item.risk::before{background:var(--risk);box-shadow:0 0 0 2px var(--risk)}
+  .tl-item.ok::before{background:var(--ok);box-shadow:0 0 0 2px var(--ok)}
+  .tl-time{font-size:12px;color:var(--muted);font-weight:600}
+  .tl-title{font-weight:600;margin:1px 0 2px}
+  .chain{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:12px 16px;font-size:13px;overflow-x:auto;white-space:pre-wrap}
+  .call{color:var(--navy);font-weight:600}
+  .err{color:var(--risk);font-weight:600}
+  .note{border-left:4px solid var(--warn);background:#fdf9ef;padding:10px 14px;border-radius:6px;margin:12px 0;font-size:14px}
+  .risk-block{border-left:4px solid var(--risk);background:#fdf3f2;padding:10px 14px;border-radius:6px;margin:12px 0;font-size:14px}
+  .ok-block{border-left:4px solid var(--ok);background:#eff7f1;padding:10px 14px;border-radius:6px;margin:12px 0;font-size:14px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  /* 模拟报错面板截图 */
+  .screenshot{background:#0f1720;border-radius:8px;overflow:hidden;border:1px solid var(--line);margin:12px auto;max-width:720px}
+  .screenshot .bar{background:#1c2733;padding:8px 12px;color:#7f8ea3;font-size:12px;display:flex;gap:8px;align-items:center}
+  .screenshot .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+  .screenshot .body{background:#0f1720;color:#d8e0ea;padding:16px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;white-space:pre-wrap}
+  .screenshot .body .h{color:#e2b93d}
+  .screenshot .body .r{color:#ef6a63}
+  .screenshot .body .g{color:#6fbf8f}
+  @media(max-width:900px){.layout{flex-direction:column}.toc{position:static;height:auto;width:100%;flex:1 1 auto}.main{padding:20px}.grid2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav class="toc">
+    <h1>TokenFlux 中转站<br>模型请求偶发超时</h1>
+    <div class="toc-sub">2026-10-26 · 故障定位报告</div>
+    <div class="grp">概述</div>
+    <a href="#sec-1">01 · 结论</a>
+    <div class="grp">诊断</div>
+    <a href="#sec-2">02 · 现象描述</a>
+    <a href="#sec-3">03 · 复现步骤</a>
+    <a href="#sec-4">04 · 证据链</a>
+    <a href="#sec-5">05 · 根因分析</a>
+    <a href="#sec-6">06 · 影响范围</a>
+    <div class="grp">处置</div>
+    <a href="#sec-7">07 · 修复方案</a>
+    <a href="#sec-8">08 · 遗留问题 / 下一步</a>
+  </nav>
+  <main class="main">
+
+    <!-- triage 注释：逐项判定 5 个图族 use/skip + 理由 -->
+
+<section id="sec-1">
+      <h2 class="sec"><span class="no">01</span>核心结论</h2>
+      <div class="tldr-grid">
+        <div class="tldr-item"><div class="k">问题一句话</div><div class="v navy">上游连接池打满导致模型请求偶发 504 超时</div></div>
+        <div class="tldr-item"><div class="k">影响范围</div><div class="v warn">glm-5.3 / claude 两条路由 · 约 1200 请求</div></div>
+        <div class="tldr-item"><div class="k">根因</div><div class="v">上游连接池耗尽 + 中转站超时阈值过短</div></div>
+        <div class="tldr-item"><div class="k">状态</div><div class="v ok">已恢复</div></div>
+        <div class="tldr-item"><div class="k">建议动作</div><div class="v navy">扩大连接池 + 拆分超时阈值 + 增加熔断</div></div>
+      </div>
+    </section>
+
+<section id="sec-2">
+      <h2 class="sec"><span class="no">02</span>现象描述</h2>
+      <p>2026-10-26 19:40–20:30 期间，TokenFlux 中转站 <code>/v1/chat/completions</code> 接口<b>偶发</b>返回 <code>504 Gateway Timeout</code>，并非全部请求失败，而是间歇性、按路由不均分布。Web 端（codex / claude 工作台）与直接 API 调用均受影响，用户侧表现为"请求卡住数秒后报上游超时"。</p>
+      <div class="screenshot">
+        <div class="bar"><span class="dot" style="background:#ef6a63"></span><span class="dot" style="background:#e2b93d"></span><span class="dot" style="background:#6fbf8f"></span>&nbsp; curl -i https://tokenflux.dev/v1/chat/completions</div>
+        <div class="body"><span class="h">POST</span> /v1/chat/completions HTTP/1.1
+Host: tokenflux.dev
+Authorization: Bearer sk-****
+Content-Type: application/json
+
+HTTP/1.1 <span class="r">504 Gateway Timeout</span>
+content-type: application/json
+
+{"error":{"message":"<span class="r">upstream timeout: read timed out after 30s</span>","type":"upstream_timeout","code":504}}</div>
+      </div>
+      <div class="fig-caption">图：问题复现时的报错面板（模拟截图）</div>
+      <div class="note"><b>关键观察</b>：错误集中在<b>上游读取超时（read timed out）</b>，而非连接拒绝或鉴权失败，指向上游响应慢/排队，而非 DNS 或网络断开。</div>
+    </section>
+
+<section id="sec-3">
+      <h2 class="sec"><span class="no">03</span>复现步骤</h2>
+      <p>该问题在高峰期偶发复现，触发条件为<b>并发请求数超过上游连接池上限</b>时。以下为可稳定触发的最小复现路径：</p>
+      <ol>
+        <li>构造并发压测，同时发起 <b>60+ 个</b> <code>/v1/chat/completions</code> 请求到 glm-5.3 路由。</li>
+        <li>上游连接池默认上限 <b>50</b>，超出部分排队等待连接。</li>
+        <li>单请求上游处理耗时 &gt; <b>15s</b> 时（高峰期排队），中转站 30s 读取超时触发。</li>
+        <li>命中超时阈值 → 返回 <code>504</code>。</li>
+      </ol>
+      <pre class="mermaid">
+sequenceDiagram
+    participant C as 客户端
+    participant T as TokenFlux 中转
+    participant U as 上游网关
+    C->>T: POST /v1/chat/completions
+    activate T
+    T->>U: 转发请求
+    activate U
+    Note over U: 连接池已满，请求排队
+    U-->>U: 排队 &gt;15s
+    Note over T: 30s 读取超时
+    T-->>C: 504 upstream timeout
+    deactivate U
+    deactivate T
+      </pre>
+      <div class="fig-caption">图：复现请求时序（连接池排队 → 上游超时）</div>
+    </section>
+
+<section id="sec-4">
+      <h2 class="sec"><span class="no">04</span>证据链</h2>
+      <p>以下为故障窗口内关键指标（每分钟粒度）与原始调用链日志，可缩放 / 悬停查看详情（动态图）。</p>
+      <div id="chart1" class="chart tall"></div>
+      <div class="fig-caption">图：故障窗口错误率 / 上游连接数 / P95 延迟时序（动态交互）</div>
+      <h3>故障演进时间线</h3>
+      <div class="timeline">
+        <div class="tl-item"><div class="tl-time">19:38</div><div class="tl-title">上游连接数开始爬升</div><div>连接池利用率 60% → 85%</div></div>
+        <div class="tl-item warn"><div class="tl-time">19:40</div><div class="tl-title">首例 504</div><div>错误率进入 1% 以上</div></div>
+        <div class="tl-item risk"><div class="tl-time">19:52</div><div class="tl-title">错误率峰值 8.3%</div><div>连接池 50/50 打满，排队加剧</div></div>
+        <div class="tl-item risk"><div class="tl-time">20:12</div><div class="tl-title">判定超时阈值过短</div><div>确认复合根因</div></div>
+        <div class="tl-item warn"><div class="tl-time">20:22</div><div class="tl-title">临时调大连接池</div><div>50 → 120，错误率开始回落</div></div>
+        <div class="tl-item ok"><div class="tl-time">20:30</div><div class="tl-title">恢复正常</div><div>错误率 &lt;0.1%，链路稳定</div></div>
+      </div>
+      <div class="fig-caption">图：故障完整演进时间线</div>
+      <details>
+        <summary>展开查看原始调用链 / 日志片段</summary>
+<pre>[19:52:03] WARN  upstream_pool   pool_utilization=1.00 pool_size=50 waiting=23 route=glm-5.3
+[19:52:05] ERROR upstream        read_timeout=30s elapsed=31.2s route=glm-5.3
+[19:52:06] ERROR upstream        read_timeout=30s elapsed=30.8s route=claude
+[19:52:08] WARN  gateway         request=slow route=glm-5.3 upstream_latency=28.4s
+[20:22:01] INFO  upstream_pool   pool_size=120 applied
+[20:30:02] INFO  healthcheck      error_rate=0.0008 recovered</pre>
+      </details>
+    </section>
+
+<section id="sec-5">
+      <h2 class="sec"><span class="no">05</span>根因分析</h2>
+      <p>通过指标时序与调用链交叉比对，定位为<b>直接原因 + 深层原因</b>两层叠加，非单点故障。</p>
+      <h3>定位路径</h3>
+      <div class="chain">
+<span class="call">[19:40]</span> 错误率抬升 0.2% → 3.1%<br>
+<span class="call">[19:50]</span> 定位到错误全部为 <span class="err">504 upstream_timeout</span><br>
+<span class="call">[19:55]</span> 按路由拆分：仅 glm-5.3 / claude 上游抖动<br>
+<span class="call">[20:05]</span> 查上游网关连接数：持续打满 50/50<br>
+<span class="call">[20:15]</span> 确认中转站超时阈值 30s 过短，高峰期排队必超<br>
+<span class="err">[结论]</span> 上游连接池耗尽 + 超时阈值过短 = 复合根因
+      </div>
+      <div class="note"><b>直接原因</b>：上游网关连接池上限 50，高峰期并发 &gt;50 时新请求排队，单请求上游耗时长于中转站 30s 阈值。</div>
+      <div class="risk-block"><b>深层原因</b>：中转站未按"连接建立 vs 首字节 vs 完整读取"拆分超时，统一 30s；且无熔断/降级，连接池满时不快速失败而是阻塞排队，放大雪崩。</div>
+    </section>
+
+<section id="sec-6">
+      <h2 class="sec"><span class="no">06</span>影响范围</h2>
+      <p>故障影响<b>两条模型路由</b>（glm-5.3 与 claude 系列），共约 <b>1200 个请求</b>受影响，错误率峰值 <b>8.3%</b>。Web 工作台与直连 API 均为同一中转链路，故同时受影响。</p>
+      <pre class="mermaid">
+graph TD
+    A[客户端<br>Codex / Claude CLI / Web 工作台] --> B[TokenFlux 中转站<br>tokenflux.dev]
+    B --> C[路由 1<br>glm-5.3]
+    B --> D[路由 2<br>claude 系列]
+    C --> E[上游 Provider A<br>fengshao 网关]
+    D --> F[上游 Provider B<br>astrdark 网关]
+    E --> G[(上游模型后端<br>glm-5.3)]
+    F --> H[(上游模型后端<br>claude)]
+    style E fill:#f6e3e1,stroke:#9b342a
+    style F fill:#f6e3e1,stroke:#9b342a
+    style G fill:#f6e3e1,stroke:#9b342a
+    style H fill:#f6e3e1,stroke:#9b342a
+      </pre>
+      <div class="fig-caption">图：受影响链路与服务拓扑（红色为瓶颈上游）</div>
+      <table>
+        <tr><th>维度</th><th>数值</th><th>严重度</th></tr>
+        <tr><td>受影响请求</td><td>约 1200</td><td><span class="tag warn">中</span></td></tr>
+        <tr><td>错误率峰值</td><td>8.3%</td><td><span class="tag risk">高</span></td></tr>
+        <tr><td>持续时长</td><td>约 50 分钟</td><td><span class="tag warn">中</span></td></tr>
+        <tr><td>涉及路由</td><td>glm-5.3 / claude</td><td><span class="tag warn">中</span></td></tr>
+        <tr><td>用户类型</td><td>Web + API 同时</td><td><span class="tag warn">中</span></td></tr>
+      </table>
+    </section>
+
+<section id="sec-7">
+      <h2 class="sec"><span class="no">07</span>修复方案</h2>
+      <p>分<b>应急止血</b>与<b>长期根治</b>两阶段，均已完成或排期：</p>
+      <div class="grid2">
+        <div class="ok-block"><b>应急（已完成 20:22）</b><br>将上游连接池上限 50 → 120，错误率立即回落至正常。</div>
+        <div class="note"><b>长期（排期）</b><br>拆分超时：连接建立 5s / 首字节 20s / 总读取 60s；并增加并发熔断与降级。</div>
+      </div>
+      <pre class="mermaid">
+flowchart LR
+    A[调大连接池<br>50 → 120] --> B[拆分超时阈值]
+    B --> C[增加连接建立 5s]
+    B --> D[首字节 20s]
+    B --> E[总读取 60s]
+    A --> F[增加并发熔断]
+    F --> G[打满时快速失败<br>而非阻塞排队]
+    C & D & E --> H[验证错误率 &lt;0.1%]
+    G --> H
+      </pre>
+      <div class="fig-caption">图：修复与验证流程</div>
+    </section>
+
+<section id="sec-8">
+      <h2 class="sec"><span class="no">08</span>遗留问题 / 下一步</h2>
+      <ul>
+        <li>连接池上限应改为<b>按上游动态可配置</b>，并随流量自动扩缩，而非固定值。</li>
+        <li>需补充<b>熔断告警</b>：连接池利用率持续 &gt;90% 超过 2 分钟即触发钉钉/飞书告警。</li>
+        <li>建议对 Web 工作台侧增加<b>客户端指数退避重试</b>，降低高峰期瞬时并发。</li>
+        <li>后续需验证 claude 路由是否同样存在连接池瓶颈（本次仅 glm-5.3 峰值打满）。</li>
+      </ul>
+    </section>
+
+  </main>
+</div>
+
+<script>
+  mermaid.initialize({startOnLoad:true, theme:'base', securityLevel:'loose',
+    themeVariables:{primaryColor:'#e5eaf3', primaryBorderColor:'#294066', primaryTextColor:'#1b2733',
+      lineColor:'#5c6672', edgeLabelBackground:'#ffffff'}});
+
+  var chart1Data = {
+    legend:['错误率(%)','连接池利用率(×100)','P95 延迟(s)'],
+    x:['19:38','19:40','19:44','19:48','19:52','19:56','20:00','20:04','20:08','20:12','20:16','20:20','20:24','20:28'],
+    series:[
+      [0.2,0.9,1.8,3.1,8.3,7.2,5.4,4.0,3.2,3.8,2.9,1.4,0.3,0.1],
+      [0.60,0.68,0.78,0.90,1.00,1.00,0.96,0.92,0.90,0.94,0.86,0.60,0.40,0.30],
+      [2.5,3.2,5.1,8.9,15.2,13.8,11.0,9.5,8.8,9.6,7.9,5.2,3.1,2.8]
+    ]
+  };
+  function initCharts(){
+    var el = document.getElementById('chart1');
+    if(!el || typeof echarts==='undefined') return;
+    var chart = echarts.init(el);
+    chart.setOption({
+      tooltip:{trigger:'axis'},
+      legend:{data:chart1Data.legend},
+      grid:{left:50,right:50,top:40,bottom:40},
+      xAxis:{type:'category', data:chart1Data.x},
+      yAxis:[{type:'value', name:'% / 利用率'}, {type:'value', name:'延迟(s)'}],
+      series:[
+        {name:'错误率(%)', type:'line', smooth:true, data:chart1Data.series[0], areaStyle:{opacity:.18}, itemStyle:{color:'#9b342a'}, markPoint:{data:[{type:'max',name:'峰值8.3%'}]}},
+        {name:'连接池利用率(×100)', type:'line', smooth:true, data:chart1Data.series[1], itemStyle:{color:'#8a5a12'}},
+        {name:'P95 延迟(s)', type:'line', smooth:true, yAxisIndex:1, data:chart1Data.series[2], itemStyle:{color:'#294066'}}
+      ],
+      animationDuration:1200
+    });
+    window.addEventListener('resize', function(){chart.resize();});
+  }
+  if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',initCharts);}else{initCharts();}
+</script>
+</body>
+</html>
