@@ -73,11 +73,48 @@
   .chain{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:12px 16px;font-size:13px;overflow-x:auto;white-space:pre-wrap}
   .call{color:var(--navy);font-weight:600}
   .err{color:var(--risk);font-weight:600}
-  /* 提示/风险块 */
-  .note{border-left:4px solid var(--warn);background:#fdf9ef;padding:10px 14px;border-radius:6px;margin:12px 0;font-size:14px}
-  .risk-block{border-left:4px solid var(--risk);background:#fdf3f2;padding:10px 14px;border-radius:6px;margin:12px 0;font-size:14px}
+  /* callout 语义块：info/ok/warn/err 四色，AI 按语义选，禁止乱起 class */
+  .callout{border-left:4px solid var(--navy);background:#f2f5fa;padding:10px 14px;border-radius:6px;margin:12px 0;font-size:14px}
+  .callout .co-title{font-weight:700;color:var(--navy);margin-bottom:2px}
+  .callout--info{border-left-color:var(--navy);background:#f2f5fa}
+  .callout--ok{border-left-color:var(--ok);background:#eff7f1}
+  .callout--warn{border-left-color:var(--warn);background:#fdf9ef}
+  .callout--err{border-left-color:var(--risk);background:#fdf3f2}
+  /* kv 键值元数据网格 */
+  .kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;border:1px solid var(--line);border-radius:8px;padding:14px 16px;background:var(--card);margin:0 0 22px}
+  .kv-cell dt{font-size:12px;color:var(--muted)}
+  .kv-cell dd{font-size:14px;font-weight:600;margin:2px 0 0}
+  .kv-cell dd.ok{color:var(--ok)} .kv-cell dd.warn{color:var(--warn)} .kv-cell dd.risk{color:var(--risk)} .kv-cell dd.navy{color:var(--navy)}
+  /* limits 指标对阈值条：当前值/上限，超限红 */
+  .limits{margin:14px 0;border:1px solid var(--line);border-radius:8px;padding:12px 16px;background:var(--card)}
+  .limits .lm-row{margin:10px 0}
+  .limits .lm-head{display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px}
+  .limits .lm-label{font-weight:600;color:var(--ink)}
+  .limits .lm-val{color:var(--muted);font-size:12px}
+  .limits .lm-bar{height:14px;background:var(--bg);border-radius:7px;overflow:hidden;border:1px solid var(--line)}
+  .limits .lm-fill{height:100%;background:var(--navy);border-radius:7px;transition:width .3s}
+  .limits .lm-row--over .lm-fill{background:var(--risk)}
+  .limits .lm-row--over .lm-val{color:var(--risk);font-weight:600}
+  .limits .lm-note{font-size:12px;color:var(--muted);margin-top:3px}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-  @media(max-width:900px){.layout{flex-direction:column}.toc{position:static;height:auto;width:100%;flex:1 1 auto}.main{padding:20px}.grid2{grid-template-columns:1fr}}
+  /* 移动端：左侧目录折叠成顶部紧凑导航，避免占满首屏 */
+  @media(max-width:900px){
+    .layout{display:block}
+    .toc{position:static;height:auto;width:100%;flex:none;padding:14px 16px 10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+    .toc h1{font-size:14px;margin:0 8px 0 0;display:inline-block}
+    .toc .toc-sub{font-size:11px;margin:0 0 0 2px;display:inline-block}
+    .toc .grp{display:none}
+    .toc a{display:inline-block;font-size:12px;padding:4px 9px;margin:0;background:rgba(255,255,255,.10);border-radius:12px}
+    .main{padding:16px 14px 60px}
+    .grid2{grid-template-columns:1fr}
+    section{padding:16px 14px;border-radius:8px}
+    section h2.sec{font-size:17px}
+    .chart{height:280px}
+    .chart.tall{height:300px}
+    .kv{grid-template-columns:1fr 1fr;gap:8px;padding:12px}
+    table{display:block;overflow-x:auto;white-space:nowrap}
+    pre.mermaid svg{max-width:100%;height:auto}
+  }
 </style>
 </head>
 <body>
@@ -98,6 +135,15 @@
 
     <!-- triage 注释：逐项判定 5 个图族 use/skip + 理由 -->
     <!-- triage: 1flow=use(...); 2dataviz=use(...); 3graph=use(...); 4timeline=use(...); 5img=use(...) -->
+
+    <!-- 头部元数据（kv 键值网格）：问题/日期/涉及系统/严重度/状态 -->
+    <dl class="kv">
+      <div class="kv-cell"><dt>问题</dt><dd>{{META_ISSUE}}</dd></div>
+      <div class="kv-cell"><dt>日期</dt><dd>{{META_DATE}}</dd></div>
+      <div class="kv-cell"><dt>涉及系统</dt><dd>{{META_SYSTEM}}</dd></div>
+      <div class="kv-cell"><dt>严重度</dt><dd class="{{SEVERITY_CLASS}}">{{SEVERITY}}</dd></div>
+      <div class="kv-cell"><dt>状态</dt><dd class="{{STATUS_CLASS}}">{{STATUS}}</dd></div>
+    </dl>
 
 <section id="sec-1">
       <h2 class="sec"><span class="no">01</span>核心结论</h2>
@@ -149,13 +195,19 @@
       <p>{{ROOTCAUSE_TEXT}}</p>
       <h3>定位路径</h3>
       <div class="chain">{{ROOTCAUSE_CHAIN}}</div>
-      <div class="note">直接原因：{{DIRECT_CAUSE}}</div>
-      <div class="risk-block">深层原因：{{DEEP_CAUSE}}</div>
+      <div class="callout callout--warn"><div class="co-title">直接原因</div>{{DIRECT_CAUSE}}</div>
+      <div class="callout callout--err"><div class="co-title">深层原因</div>{{DEEP_CAUSE}}</div>
     </section>
 
 <section id="sec-6">
       <h2 class="sec"><span class="no">06</span>影响范围</h2>
       <p>{{IMPACT_TEXT}}</p>
+      <!-- limits 指标对阈值条：当前值/上限，超限红 -->
+      <div class="limits">
+        <div class="lm-row"><div class="lm-head"><span class="lm-label">{{METRIC_1_LABEL}}</span><span class="lm-val">{{METRIC_1_VAL}} / 上限 {{METRIC_1_LIMIT}}</span></div><div class="lm-bar"><div class="lm-fill" style="width:{{METRIC_1_PCT}}%"></div></div></div>
+        <div class="lm-row {{METRIC_2_OVER}}"><div class="lm-head"><span class="lm-label">{{METRIC_2_LABEL}}</span><span class="lm-val">{{METRIC_2_VAL}} / 上限 {{METRIC_2_LIMIT}}</span></div><div class="lm-bar"><div class="lm-fill" style="width:{{METRIC_2_PCT}}%"></div></div><div class="lm-note">{{METRIC_2_NOTE}}</div></div>
+      </div>
+      <div class="fig-caption">图：关键指标对阈值（超限红色标记）</div>
       <!-- 关系/拓扑图 -->
       <pre class="mermaid">
 {{GRAPH_MERMAID}}

@@ -60,9 +60,29 @@
   .chain{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:12px 16px;font-size:13px;overflow-x:auto;white-space:pre-wrap}
   .call{color:var(--navy);font-weight:600}
   .err{color:var(--risk);font-weight:600}
-  .note{border-left:4px solid var(--warn);background:#fdf9ef;padding:10px 14px;border-radius:6px;margin:12px 0;font-size:14px}
-  .risk-block{border-left:4px solid var(--risk);background:#fdf3f2;padding:10px 14px;border-radius:6px;margin:12px 0;font-size:14px}
-  .ok-block{border-left:4px solid var(--ok);background:#eff7f1;padding:10px 14px;border-radius:6px;margin:12px 0;font-size:14px}
+  /* callout 语义块：info/ok/warn/err 四色 */
+  .callout{border-left:4px solid var(--navy);background:#f2f5fa;padding:10px 14px;border-radius:6px;margin:12px 0;font-size:14px}
+  .callout .co-title{font-weight:700;color:var(--navy);margin-bottom:2px}
+  .callout--info{border-left-color:var(--navy);background:#f2f5fa}
+  .callout--ok{border-left-color:var(--ok);background:#eff7f1}
+  .callout--warn{border-left-color:var(--warn);background:#fdf9ef}
+  .callout--err{border-left-color:var(--risk);background:#fdf3f2}
+  /* kv 键值元数据网格 */
+  .kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;border:1px solid var(--line);border-radius:8px;padding:14px 16px;background:var(--card);margin:0 0 22px}
+  .kv-cell dt{font-size:12px;color:var(--muted)}
+  .kv-cell dd{font-size:14px;font-weight:600;margin:2px 0 0}
+  .kv-cell dd.ok{color:var(--ok)} .kv-cell dd.warn{color:var(--warn)} .kv-cell dd.risk{color:var(--risk)} .kv-cell dd.navy{color:var(--navy)}
+  /* limits 指标对阈值条 */
+  .limits{margin:14px 0;border:1px solid var(--line);border-radius:8px;padding:12px 16px;background:var(--card)}
+  .limits .lm-row{margin:10px 0}
+  .limits .lm-head{display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px}
+  .limits .lm-label{font-weight:600;color:var(--ink)}
+  .limits .lm-val{color:var(--muted);font-size:12px}
+  .limits .lm-bar{height:14px;background:var(--bg);border-radius:7px;overflow:hidden;border:1px solid var(--line)}
+  .limits .lm-fill{height:100%;background:var(--navy);border-radius:7px;transition:width .3s}
+  .limits .lm-row--over .lm-fill{background:var(--risk)}
+  .limits .lm-row--over .lm-val{color:var(--risk);font-weight:600}
+  .limits .lm-note{font-size:12px;color:var(--muted);margin-top:3px}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
   /* 模拟报错面板截图 */
   .screenshot{background:#0f1720;border-radius:8px;overflow:hidden;border:1px solid var(--line);margin:12px auto;max-width:720px}
@@ -72,7 +92,24 @@
   .screenshot .body .h{color:#e2b93d}
   .screenshot .body .r{color:#ef6a63}
   .screenshot .body .g{color:#6fbf8f}
-  @media(max-width:900px){.layout{flex-direction:column}.toc{position:static;height:auto;width:100%;flex:1 1 auto}.main{padding:20px}.grid2{grid-template-columns:1fr}}
+  /* 移动端：左侧目录折叠成顶部紧凑导航，避免占满首屏 */
+  @media(max-width:900px){
+    .layout{display:block}
+    .toc{position:static;height:auto;width:100%;flex:none;padding:14px 16px 10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+    .toc h1{font-size:14px;margin:0 8px 0 0;display:inline-block}
+    .toc .toc-sub{font-size:11px;margin:0 0 0 2px;display:inline-block}
+    .toc .grp{display:none}
+    .toc a{display:inline-block;font-size:12px;padding:4px 9px;margin:0;background:rgba(255,255,255,.10);border-radius:12px}
+    .main{padding:16px 14px 60px}
+    .grid2{grid-template-columns:1fr}
+    section{padding:16px 14px;border-radius:8px}
+    section h2.sec{font-size:17px}
+    .chart{height:280px}
+    .chart.tall{height:300px}
+    .kv{grid-template-columns:1fr 1fr;gap:8px;padding:12px}
+    table{display:block;overflow-x:auto;white-space:nowrap}
+    pre.mermaid svg{max-width:100%;height:auto}
+  }
 </style>
 </head>
 <body>
@@ -95,6 +132,15 @@
   <main class="main">
 
     <!-- triage 注释：逐项判定 5 个图族 use/skip + 理由 -->
+
+    <!-- 头部元数据（kv 键值网格） -->
+    <dl class="kv">
+      <div class="kv-cell"><dt>问题</dt><dd>模型请求偶发 504 超时</dd></div>
+      <div class="kv-cell"><dt>日期</dt><dd>2026-10-26</dd></div>
+      <div class="kv-cell"><dt>涉及系统</dt><dd>TokenFlux 中转站 · tokenflux.dev</dd></div>
+      <div class="kv-cell"><dt>严重度</dt><dd class="warn">中高（P1）</dd></div>
+      <div class="kv-cell"><dt>状态</dt><dd class="ok">已恢复</dd></div>
+    </dl>
 
 <section id="sec-1">
       <h2 class="sec"><span class="no">01</span>核心结论</h2>
@@ -123,7 +169,7 @@ content-type: application/json
 {"error":{"message":"<span class="r">upstream timeout: read timed out after 30s</span>","type":"upstream_timeout","code":504}}</div>
       </div>
       <div class="fig-caption">图：问题复现时的报错面板（模拟截图）</div>
-      <div class="note"><b>关键观察</b>：错误集中在<b>上游读取超时（read timed out）</b>，而非连接拒绝或鉴权失败，指向上游响应慢/排队，而非 DNS 或网络断开。</div>
+      <div class="callout callout--info"><div class="co-title">关键观察</div>错误集中在<b>上游读取超时（read timed out）</b>，而非连接拒绝或鉴权失败，指向上游响应慢/排队，而非 DNS 或网络断开。</div>
     </section>
 
 <section id="sec-3">
@@ -192,13 +238,21 @@ sequenceDiagram
 <span class="call">[20:15]</span> 确认中转站超时阈值 30s 过短，高峰期排队必超<br>
 <span class="err">[结论]</span> 上游连接池耗尽 + 超时阈值过短 = 复合根因
       </div>
-      <div class="note"><b>直接原因</b>：上游网关连接池上限 50，高峰期并发 &gt;50 时新请求排队，单请求上游耗时长于中转站 30s 阈值。</div>
-      <div class="risk-block"><b>深层原因</b>：中转站未按"连接建立 vs 首字节 vs 完整读取"拆分超时，统一 30s；且无熔断/降级，连接池满时不快速失败而是阻塞排队，放大雪崩。</div>
+      <div class="callout callout--warn"><div class="co-title">直接原因</div>上游网关连接池上限 50，高峰期并发 &gt;50 时新请求排队，单请求上游耗时长于中转站 30s 阈值。</div>
+      <div class="callout callout--err"><div class="co-title">深层原因</div>中转站未按"连接建立 vs 首字节 vs 完整读取"拆分超时，统一 30s；且无熔断/降级，连接池满时不快速失败而是阻塞排队，放大雪崩。</div>
     </section>
 
 <section id="sec-6">
       <h2 class="sec"><span class="no">06</span>影响范围</h2>
       <p>故障影响<b>两条模型路由</b>（glm-5.3 与 claude 系列），共约 <b>1200 个请求</b>受影响，错误率峰值 <b>8.3%</b>。Web 工作台与直连 API 均为同一中转链路，故同时受影响。</p>
+      <!-- limits 指标对阈值条：超限红 -->
+      <div class="limits">
+        <div class="lm-row lm-row--over"><div class="lm-head"><span class="lm-label">错误率峰值</span><span class="lm-val">8.3% / 上限 5%</span></div><div class="lm-bar"><div class="lm-fill" style="width:83%"></div></div><div class="lm-note">超过告警阈值 5%，触发 P1 告警</div></div>
+        <div class="lm-row lm-row--over"><div class="lm-head"><span class="lm-label">上游连接池</span><span class="lm-val">50 / 上限 50</span></div><div class="lm-bar"><div class="lm-fill" style="width:100%"></div></div><div class="lm-note">连接池打满，新请求排队</div></div>
+        <div class="lm-row"><div class="lm-head"><span class="lm-label">P95 延迟</span><span class="lm-val">15.2s / 上限 10s</span></div><div class="lm-bar"><div class="lm-fill" style="width:76%"></div></div></div>
+        <div class="lm-row"><div class="lm-head"><span class="lm-label">受影响请求</span><span class="lm-val">1200 / 上限 5000</span></div><div class="lm-bar"><div class="lm-fill" style="width:24%"></div></div></div>
+      </div>
+      <div class="fig-caption">图：关键指标对阈值（红色为超限）</div>
       <pre class="mermaid">
 graph TD
     A[客户端<br>Codex / Claude CLI / Web 工作台] --> B[TokenFlux 中转站<br>tokenflux.dev]
@@ -228,8 +282,8 @@ graph TD
       <h2 class="sec"><span class="no">07</span>修复方案</h2>
       <p>分<b>应急止血</b>与<b>长期根治</b>两阶段，均已完成或排期：</p>
       <div class="grid2">
-        <div class="ok-block"><b>应急（已完成 20:22）</b><br>将上游连接池上限 50 → 120，错误率立即回落至正常。</div>
-        <div class="note"><b>长期（排期）</b><br>拆分超时：连接建立 5s / 首字节 20s / 总读取 60s；并增加并发熔断与降级。</div>
+        <div class="callout callout--ok"><div class="co-title">应急（已完成 20:22）</div>将上游连接池上限 50 → 120，错误率立即回落至正常。</div>
+        <div class="callout callout--warn"><div class="co-title">长期（排期）</div>拆分超时：连接建立 5s / 首字节 20s / 总读取 60s；并增加并发熔断与降级。</div>
       </div>
       <pre class="mermaid">
 flowchart LR

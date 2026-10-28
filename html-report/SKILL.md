@@ -70,11 +70,22 @@ metadata:
 - 时间线 `.timeline`：纵向时间轴列表流，居中会破坏时间线可读性
 - 表格 `table`：宽度 100%、单元格左对齐
 - 代码块 / 日志 `.chain`、`details pre`：代码左对齐，居中会导致错位
-- 提示块 `.note` / `.risk-block` / `.ok-block`：带左边框的文本块，左对齐
+- callout 语义块 `.callout`：带左边框的文本块，左对齐
 
 > 骨架模板已内置这些规则；手写 HTML 时务必保留，不要删掉 `pre.mermaid` / `pre.plantuml` / `img` 的居中规则。
 
+## 移动端（手机查看 · 硬性）
+
+报告经常要在手机上打开，必须保证首屏不被导航占满：
+
+- 断点 `@media(max-width:900px)`：`.layout` 改为 `display:block`，左侧目录 `.toc` 变为**顶部横向胶囊导航**（`display:flex;flex-wrap:wrap`，隐藏 `.grp` 分组标题），高度控制在 ~165px。
+- `.kv` 元数据在手机上改两列（`grid-template-columns:1fr 1fr`）。
+- `.chart` 高度降到 280–300px；`table` 用 `display:block;overflow-x:auto` 允许横向滚动而不撑破页面。
+- 验收标准：手机 390px 视口下 `document.documentElement.scrollWidth === window.innerWidth`（无横向溢出），且 `.kv` 的 top 值应小于 250px（不被目录挤出首屏）。
+- 骨架已内置这些规则，复制骨架即可；手写时不要删。
+
 ## 技术规范
+
 
 
 - Mermaid：用 CDN script（cdn.jsdelivr.net/npm/mermaid），pre class="mermaid" 写图；启用 securityLevel loose 便于交互。**流程图必须水平居中**（骨架已含 pre.mermaid{text-align:center} + svg margin:0 auto，复制骨架即可；手写时务必保留该规则，Mermaid 默认左对齐）。
@@ -82,6 +93,9 @@ metadata:
 - 折叠：长日志/原始输出放 details>summary + pre。
 - 截图：能内联就 data:image/png;base64；不能则相对路径并标注来源。
 - 自包含：优先 CDN（有网即可开）；若用户要完全离线，把 mermaid/echarts 的 min.js 内联进 script。
+- callout 语义块：统一用 `.callout callout--info/ok/warn/err` 四种语义（info=提示蓝 / ok=正常绿 / warn=告警黄 / err=错误红），AI 按语义选，禁止自造 class。带标题用 `.co-title`。
+- limits 指标对阈值条：用 `.limits` 结构（label + 当前值/上限 + 填充条），超限行加 `lm-row--over` 自动变红；适合"影响范围/指标"场景（如错误率 8.3% / 阈值 5%）。
+- kv 头部元数据：用 `.kv` 键值网格放报告元信息（问题/日期/涉及系统/严重度/状态），严重度/状态可按语义加 ok/warn/risk class。
 - 配色：统一用 --navy #294066（主）、--ok #276749（正常）、--warn #8a5a12（告警）、--risk #9b342a（危险）、--muted #5c6672（次要）、--ink #1b2733（正文）、--line #e4e2db（边框）、--bg #f6f7f9（底）。
 
 ## 校验（收尾必跑）
