@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CAN 总线 · 知识学习报告</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<style>
+  :root{
+    --navy:#294066; --ok:#276749; --warn:#8a5a12; --risk:#9b342a;
+    --muted:#5c6672; --ink:#1b2733; --line:#e4e2db;
+    --bg:#f7f6f3; --card:#ffffff; --accent:#2d6a9f;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--bg);line-height:1.75}
+  /* 顶部阅读进度条 */
+  #progress{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:999;transition:width .1s}
+  .layout{display:flex;max-width:1240px;margin:0 auto}
+  .toc{position:sticky;top:0;height:100vh;width:236px;flex:0 0 236px;background:#1f2c3d;color:#fff;padding:24px 18px;overflow-y:auto}
+  .toc h1{font-size:15px;margin:0 0 4px;line-height:1.45}
+  .toc .toc-sub{font-size:11.5px;color:#93a4bb;margin-bottom:18px}
+  .toc a{display:block;color:#d3dce8;text-decoration:none;padding:5px 8px;border-radius:6px;font-size:13px;margin-bottom:1px}
+  .toc a:hover{background:rgba(255,255,255,.10);color:#fff}
+  .toc a.active{background:var(--accent);color:#fff}
+  .main{flex:1;padding:32px 40px 100px;min-width:0}
+  /* 首屏结论卡 */
+  .hero{background:linear-gradient(135deg,#22314a,#2d6a9f);color:#fff;border-radius:14px;padding:28px 30px;margin-bottom:26px}
+  .hero .label{font-size:12px;letter-spacing:.08em;opacity:.75;text-transform:uppercase}
+  .hero h2{margin:8px 0 10px;font-size:24px;line-height:1.4}
+  .hero p{margin:0;font-size:15px;opacity:.92}
+  section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px 28px;margin-bottom:22px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  section h2.sec{display:flex;align-items:center;gap:10px;margin:0 0 16px;font-size:19px;border-bottom:2px solid var(--line);padding-bottom:10px}
+  section h2.sec .no{background:var(--accent);color:#fff;border-radius:6px;padding:2px 9px;font-size:13px}
+  section h3{margin:20px 0 8px;font-size:16px;color:var(--navy)}
+  p{margin:9px 0}
+  /* kv 参数卡 */
+  .kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:14px 0}
+  .kv-cell{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:#fbfcfd}
+  .kv-cell dt{font-size:11.5px;color:var(--muted)}
+  .kv-cell dd{font-size:15px;font-weight:600;margin:3px 0 0}
+  /* 类比卡 */
+  .analogy{border-left:4px solid #574a86;background:#f5f3fa;border-radius:6px;padding:12px 16px;margin:14px 0;font-size:14.5px}
+  .analogy .ana-label{font-weight:700;color:#574a86;margin-bottom:2px}
+  /* callout 语义块 */
+  .callout{border-left:4px solid var(--navy);background:#f2f5fa;padding:10px 14px;border-radius:6px;margin:12px 0;font-size:14px}
+  .callout .co-title{font-weight:700;color:var(--navy);margin-bottom:2px}
+  .callout--info{border-left-color:var(--navy);background:#f2f5fa}
+  .callout--ok{border-left-color:var(--ok);background:#eff7f1}
+  .callout--warn{border-left-color:var(--warn);background:#fdf9ef}
+  .callout--err{border-left-color:var(--risk);background:#fdf3f2}
+  /* 对照表 */
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+  th{background:#eef2f7;color:var(--navy);font-weight:600}
+  .wrong{color:var(--risk)} .right{color:var(--ok)}
+  /* 图 */
+  pre.mermaid{text-align:center;background:transparent;margin:14px 0}
+  pre.mermaid svg{display:block;margin:0 auto;max-width:100%;height:auto}
+  .chart{width:100%;height:300px;margin:14px 0}
+  .fig-caption{font-size:12px;color:var(--muted);text-align:center;margin:6px 0 16px}
+  /* ===== 交互演示区 ===== */
+  .demo{background:#0f1720;border-radius:10px;padding:18px;margin:16px 0;color:#d8e0ea}
+  .demo-title{font-size:13px;color:#7f8ea3;margin-bottom:12px}
+  .bus{position:relative;height:56px;margin:10px 0 18px}
+  .bus-line{position:absolute;top:26px;left:0;right:0;height:4px;background:#2c3a4d;border-radius:2px}
+  .bus-pulse{position:absolute;top:24px;height:8px;width:8px;border-radius:50%;background:#5ac8fa;box-shadow:0 0 10px #5ac8fa;left:0;opacity:0}
+  .bus-node{position:absolute;top:0;transform:translateX(-50%);text-align:center;font-size:11px;color:#9fb0c4}
+  .bus-node .dot{width:14px;height:14px;border-radius:50%;background:#3b4a5e;margin:0 auto 6px;border:2px solid #5a6c84;transition:background .2s,border-color .2s}
+  .bus-node.win .dot{background:#5ac8fa;border-color:#5ac8fa;box-shadow:0 0 12px rgba(90,200,250,.8)}
+  .demo-btn{background:#2d6a9f;color:#fff;border:0;border-radius:8px;padding:9px 18px;font-size:14px;cursor:pointer;font-family:inherit}
+  .demo-btn:hover{background:#255a88}
+  .demo-btn:disabled{opacity:.5;cursor:not-allowed}
+  .demo-log{margin-top:12px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.9;color:#9fb0c4;min-height:60px}
+  .demo-log .ok{color:#6fbf8f} .demo-log .wait{color:#e2b93d} .demo-log .err{color:#ef6a63}
+  /* ===== 自测题 ===== */
+  .quiz{border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin:14px 0;background:#fbfcfd}
+  .quiz .q{font-weight:600;margin-bottom:10px}
+  .quiz .opt{display:block;width:100%;text-align:left;background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin:7px 0;cursor:pointer;font-size:14px;font-family:inherit;color:var(--ink);transition:.15s}
+  .quiz .opt:hover{border-color:var(--accent);background:#f4f8fc}
+  .quiz .opt.correct{border-color:var(--ok);background:#eff7f1;color:var(--ok);font-weight:600}
+  .quiz .opt.wrong{border-color:var(--risk);background:#fdf3f2;color:var(--risk)}
+  .quiz .fb{display:none;margin-top:10px;font-size:13.5px;padding:10px 12px;border-radius:6px;background:#eef2f7}
+  .quiz .fb.show{display:block}
+  /* details */
+  details{border:1px solid var(--line);border-radius:8px;margin:12px 0;background:#fbfcfd}
+  details summary{cursor:pointer;padding:10px 14px;font-weight:600;color:var(--navy);font-size:14px}
+  details pre{background:#0f1720;color:#d8e0ea;padding:14px 16px;border-radius:0 0 8px 8px;overflow-x:auto;font-size:12.5px;margin:0;white-space:pre-wrap;word-break:break-word}
+  code{background:#eef2f7;padding:1px 5px;border-radius:4px;font-size:.92em}
+  abbr{border-bottom:1px dotted var(--muted);cursor:help;text-decoration:none}
+  @media(max-width:900px){
+    .layout{display:block}
+    .toc{position:static;height:auto;width:100%;flex:none;padding:14px 16px 10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+    .toc h1{font-size:14px;margin:0 8px 0 0;display:inline-block}
+    .toc .toc-sub{font-size:11px;display:inline-block;margin:0}
+    .toc a{display:inline-block;font-size:12px;padding:4px 9px;margin:0;background:rgba(255,255,255,.10);border-radius:12px}
+    .main{padding:16px 14px 60px}
+    section{padding:16px 14px}
+    .hero{padding:20px 18px} .hero h2{font-size:20px}
+    .chart{height:260px}
+    .kv{grid-template-columns:1fr 1fr}
+    table{display:block;overflow-x:auto;white-space:nowrap}
+  }
+</style>
+</head>
+<body>
+<div id="progress"></div>
+<div class="layout">
+  <nav class="toc">
+    <h1>CAN 总线</h1>
+    <div class="toc-sub">Controller Area Network · 学习报告</div>
+    <a href="#sec-1">01 · 它是什么</a>
+    <a href="#sec-2">02 · 为什么需要它</a>
+    <a href="#sec-3">03 · 核心原理</a>
+    <a href="#sec-4">04 · 关键机制</a>
+    <a href="#sec-5">05 · 动手看一遍</a>
+    <a href="#sec-6">06 · 常见误区</a>
+    <a href="#sec-7">07 · 进阶与延伸</a>
+    <a href="#sec-8">08 · 自测</a>
+  </nav>
+  <main class="main">
+
+    <!-- triage: 1flow=use(原理流程); 2dataviz=use(时序/速率对比); 3graph=use(拓扑); 4timeline=use(帧时序); 5img=skip(纯讲解无需截图) -->
+
+    <!-- 首屏：先给结论 -->
+    <div class="hero">
+      <div class="label">CAN 总线</div>
+      <h2>CAN 是一种“多主、广播、差分”的串行总线：所有节点挂在同一对线上，谁先抢到总线谁发言，靠报文 ID 而不是地址来决定优先权。</h2>
+      <p>它让几十个 ECU 用两根线就能互相通信，且在电磁噪声极强的汽车环境里几乎不出错——这正是它统治车载网络 40 年的原因。</p>
+    </div>
+
+    <section id="sec-1">
+      <h2 class="sec"><span class="no">01</span>它是什么</h2>
+      <p>CAN（Controller Area Network）由博世在 1986 年为汽车电子开发，1993 年成为国际标准 ISO 11898。它是一套<b>物理层 + 数据链路层</b>规范：物理层规定了差分信号怎么发，链路层规定了帧怎么组、冲突怎么解、错误怎么查。</p>
+      <dl class="kv">
+        <div class="kv-cell"><dt>标准 / 速率</dt><dd>ISO 11898 / 最高 1 Mbps</dd></div>
+        <div class="kv-cell"><dt>拓扑</dt><dd>总线型（多点并联）</dd></div>
+        <div class="kv-cell"><dt>信号</dt><dd>CAN_H / CAN_L 差分</dd></div>
+        <div class="kv-cell"><dt>寻址方式</dt><dd>报文 ID（非节点地址）</dd></div>
+      </dl>
+      <div class="analogy"><div class="ana-label">一句话类比</div>CAN 总线像一间会议室：谁想发言就先举手（拉低总线），如果几个人同时举手，就看谁要说的“事”更紧急（ID 更小）——紧急的人先说，其他人自动闭嘴等下一轮。没有一个主持人分配发言权。</div>
+    </section>
+
+    <section id="sec-2">
+      <h2 class="sec"><span class="no">02</span>为什么需要它</h2>
+      <p>在 CAN 之前，汽车线束是点对点的：每增加一个功能就要多拉一组线。一台车动辄几公里线束、上百公斤铜。CAN 用两根线承载所有 ECU 的通信，把线束重量和成本砍掉一大截，同时解决了“多个节点同时想说话怎么办”。</p>
+      <table>
+        <tr><th>维度</th><th>没有它时</th><th>有了它之后</th></tr>
+        <tr><td>线束</td><td class="wrong">每功能一组线，几公里长</td><td class="right">两根双绞线走全车</td></tr>
+        <tr><td>扩展性</td><td class="wrong">加功能就要重新布线</td><td class="right">新节点并联挂上即可</td></tr>
+      </table>
+    </section>
+
+    <section id="sec-3">
+      <h2 class="sec"><span class="no">03</span>核心原理</h2>
+      <p>CAN 的三个核心设计是：<b>差分传输</b>（抗干扰）、<b>非破坏性仲裁</b>（冲突不丢包）、<b>广播通信</b>（一发多收）。下面先看一帧数据从产生到被接收的完整链路。</p>
+      <pre class="mermaid">
+flowchart LR
+    A[应用层<br>要发送数据] --> B[组帧<br>ID + 数据 + CRC]
+    B --> C{总线空闲?}
+    C -- 是 --> D[逐位发送]
+    C -- 否 --> C
+    D --> E{位电平与其他节点冲突?}
+    E -- 否 --> F[继续发送]
+    E -- 是 --> G[ID 大的一方<br>主动退让]
+    G --> H[ID 小的一方<br>继续发送]
+    F --> I[接收方 CRC 校验]
+    H --> I
+    I --> J{校验通过?}
+    J -- 是 --> K[ACK 应答<br>帧被接收]
+    J -- 否 --> L[发送错误帧<br>重传]
+      </pre>
+      <div class="fig-caption">图：一帧 CAN 数据从组帧到被接收的完整路径</div>
+      <pre class="mermaid">
+sequenceDiagram
+    participant NA as 节点A (ID 0x100)
+    participant NB as 节点B (ID 0x200)
+    participant BUS as CAN 总线
+    NA->>BUS: 同时开始发送
+    NB->>BUS: 同时开始发送
+    Note over BUS: 逐位比较 ID（显性位 0 优先）<br>0x100 vs 0x200 → 第 3 位起 A 为 0、B 为 1
+    Note over BUS: A 发显性位(0)，总线被拉低<br>B 想发隐性位(1) 却读回 0
+    NB-->>NB: 判定仲裁失败，立即停止发送
+    NA->>BUS: 继续发送完整帧
+    BUS-->>NA: ACK
+      </pre>
+      <div class="fig-caption">图：两个节点同时发送时的非破坏性仲裁过程</div>
+    </section>
+
+    <section id="sec-4">
+      <h2 class="sec"><span class="no">04</span>关键机制</h2>
+      <h3>① 差分信号：为什么两根线比一根线抗干扰</h3>
+      <p>CAN 用 CAN_H 和 CAN_L 两根线，接收端判断的是两者的<b>电压差</b>而不是对地电压。外部电磁干扰会同时叠加到两根线上（共模干扰），相减就抵消了；真正的信号（差模）被完整保留。显性位（逻辑 0）差值约 2V，隐性位（逻辑 1）差值约 0V。</p>
+      <div class="analogy"><div class="ana-label">类比</div>就像两个人同时被风吹得往同一边晃，但只要看他们之间的相对距离，风的影响就消失了。</div>
+      <h3>② 优先级：ID 越小越优先，而且冲突不丢数据</h3>
+      <p>CAN 用“线与”逻辑：只要有一个节点发显性位（0），总线就是 0。仲裁发生在 ID 字段，各节点边发边听——谁发的是隐性位（1）却读回显性位（0），就说明有更高优先级的节点在说话，自己立刻退让。退让方<b>没有损失</b>，下一轮总线空闲时可以直接重发。</p>
+      <div id="chart1" class="chart"></div>
+      <div class="fig-caption">图：CAN / CAN FD / 车载以太网 的速率与典型用途对比</div>
+    </section>
+
+    <section id="sec-5">
+      <h2 class="sec"><span class="no">05</span>动手看一遍</h2>
+      <p>光看图容易觉得抽象。下面这个演示模拟了一次真实的总线仲裁：4 个节点同时想发数据，看看谁最终抢到总线。</p>
+      <div class="demo">
+        <div class="demo-title">总线仲裁模拟 · 点击按钮运行</div>
+        <div class="bus" id="bus">
+          <div class="bus-line"></div>
+          <div class="bus-pulse" id="pulse"></div>
+          <div class="bus-node" style="left:12%"><div class="dot" id="n1"></div>节点 A</div>
+          <div class="bus-node" style="left:37%"><div class="dot" id="n2"></div>节点 B</div>
+          <div class="bus-node" style="left:62%"><div class="dot" id="n3"></div>节点 C</div>
+          <div class="bus-node" style="left:87%"><div class="dot" id="n4"></div>节点 D</div>
+        </div>
+        <button class="demo-btn" id="demoBtn">▶ 模拟一次总线通信</button>
+        <div class="demo-log" id="demoLog"></div>
+      </div>
+      <div class="fig-caption">图：交互演示（点击按钮触发）</div>
+    </section>
+
+    <section id="sec-6">
+      <h2 class="sec"><span class="no">06</span>常见误区</h2>
+      <table>
+        <tr><th>常见误解</th><th>实际情况</th></tr>
+        <tr><td class="wrong">“CAN 需要主节点来调度，谁先发由主机决定”</td><td class="right">CAN 是<b>多主</b>架构，没有主机。任何节点在总线空闲时都可以主动发送，优先级由报文 ID 决定。</td></tr>
+        <tr><td class="wrong">“两个节点同时发送会撞车、数据损坏，必须重传”</td><td class="right">仲裁是<b>非破坏性</b>的：优先级低的节点在 ID 阶段就主动退出，总线上的位不会被破坏，高优先级帧完整发出。</td></tr>
+      </table>
+    </section>
+
+    <section id="sec-7">
+      <h2 class="sec"><span class="no">07</span>进阶与延伸</h2>
+      <p>学完基础后，建议按这个顺序继续：CAN FD（可变速率、最大 64 字节负载）、CANopen（应用层协议，工业与汽车常用）、以及车载以太网（SOME/IP）。</p>
+      <ul>
+        <li>CAN FD：数据段可提速到 5–8 Mbps，单帧最多 64 字节</li>
+        <li>CANopen / J1939：在 CAN 之上定义的应用层规范</li>
+      </ul>
+    </section>
+
+    <section id="sec-8">
+      <h2 class="sec"><span class="no">08</span>自测</h2>
+      <div class="quiz" data-answer="1">
+        <div class="q">你的节点正在用 ID 0x300 发送数据，突然检测到自己发出的是隐性位、读回的却是显性位。你下一步应该怎么做？</div>
+        <button class="opt" data-i="0">继续发送，忽略这个差异</button>
+        <button class="opt" data-i="1">立刻停止发送，让出总线给更高优先级的节点</button>
+        <button class="opt" data-i="2">发送错误帧，告诉所有节点总线故障</button>
+        <div class="fb" data-right="正确。读到显性位说明有更小 ID 的节点在同时发送，这就是仲裁失败。CAN 规定此时应停止发送并转为接收，退让不丢数据，下一轮总线空闲可直接重发。" data-wrong="不对。这个现象就是仲裁失败：有更高优先级（更小 ID）的节点在同时发送。CAN 规定主动退让并转为接收，绝不能继续发送（会破坏总线），也不需要发错误帧（这不是总线故障）。"></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+  mermaid.initialize({startOnLoad:true, theme:'base', securityLevel:'loose',
+    themeVariables:{primaryColor:'#e7eef7', primaryBorderColor:'#2d6a9f', primaryTextColor:'#1b2733',
+      lineColor:'#5c6672', edgeLabelBackground:'#ffffff'}});
+
+  // 阅读进度条
+  window.addEventListener('scroll', function(){
+    var h = document.documentElement.scrollHeight - window.innerHeight;
+    var p = h > 0 ? (window.scrollY / h) * 100 : 0;
+    document.getElementById('progress').style.width = p + '%';
+  });
+
+  // 目录高亮
+  var secs = [...document.querySelectorAll('section[id]')];
+  var links = [...document.querySelectorAll('.toc a')];
+  window.addEventListener('scroll', function(){
+    var cur = secs.filter(function(s){ return s.getBoundingClientRect().top <= 120; }).pop();
+    links.forEach(function(a){ a.classList.toggle('active', cur && a.getAttribute('href') === '#' + cur.id); });
+  });
+
+  // 小图（示例：速率 vs 距离）
+  function initCharts(){
+    var el = document.getElementById('chart1');
+    if(!el || typeof echarts === 'undefined') return;
+    var chart = echarts.init(el);
+    chart.setOption({
+      tooltip:{trigger:'axis'},
+      grid:{left:60,right:30,top:30,bottom:40},
+      xAxis:{type:'category', data: ["CAN 2.0","CAN FD","车载以太网"]},
+      yAxis:{type:'value', name: "最高速率 (Mbps)"},
+      series:[{type:'bar', data: [1, 8, 1000], itemStyle:{color:'#2d6a9f', borderRadius:[4,4,0,0]}}]
+    });
+    window.addEventListener('resize', function(){ chart.resize(); });
+  }
+
+  // 交互演示：总线仲裁模拟
+  (function(){
+    var btn = document.getElementById('demoBtn');
+    var log = document.getElementById('demoLog');
+    var pulse = document.getElementById('pulse');
+    if(!btn) return;
+    var nodes = ['n1','n2','n3','n4'];
+    var busRoot = document.getElementById('bus');
+    var names = ['节点 A','节点 B','节点 C','节点 D'];
+    btn.addEventListener('click', function(){
+      btn.disabled = true; log.innerHTML = '';
+      var winner = Math.floor(Math.random() * 4);
+      var seq = [
+        {t:0, cls:'wait', txt:'总线空闲，4 个节点同时准备发送'},
+        {t:600, cls:'wait', txt:'同时拉低总线 → 所有节点检测到冲突'},
+        {t:1400, cls:'', txt:'进入仲裁：ID 数值小（优先级高）的节点赢得总线'},
+        {t:2200, cls:'ok', txt: names[winner] + ' 赢得仲裁（被分配的 ID 数值最小），开始发送数据帧'},
+        {t:3200, cls:'ok', txt:'其余 3 个节点退让，等待下一轮'}
+      ];
+      seq.forEach(function(s){
+        setTimeout(function(){
+          log.innerHTML += '<div class="' + s.cls + '">' + s.txt + '</div>';
+        }, s.t);
+      });
+      // 脉冲动画
+      pulse.style.transition = 'none'; pulse.style.opacity = 1; pulse.style.left = '0%';
+      setTimeout(function(){ pulse.style.transition = 'all 1.2s linear'; pulse.style.left = '92%'; }, 50);
+      setTimeout(function(){ pulse.style.opacity = 0; }, 1300);
+      // 高亮赢家
+      setTimeout(function(){
+        nodes.forEach(function(id, i){ document.getElementById(id).parentElement.classList.toggle('win', i === winner); });
+      }, 2200);
+      setTimeout(function(){
+        btn.disabled = false;
+        nodes.forEach(function(id){ document.getElementById(id).parentElement.classList.remove('win'); });
+      }, 4200);
+    });
+  })();
+
+  // 自测题
+  document.querySelectorAll('.quiz').forEach(function(q){
+    var ans = Number(q.dataset.answer);
+    var fb = q.querySelector('.fb');
+    q.querySelectorAll('.opt').forEach(function(o){
+      o.addEventListener('click', function(){
+        if(q.dataset.done) return;
+        q.dataset.done = '1';
+        var i = Number(o.dataset.i);
+        o.classList.add(i === ans ? 'correct' : 'wrong');
+        if(i !== ans) q.querySelectorAll('.opt')[ans].classList.add('correct');
+        fb.textContent = i === ans ? fb.dataset.right : fb.dataset.wrong;
+        fb.classList.add('show');
+      });
+    });
+  });
+
+  if(document.readyState === 'loading'){ document.addEventListener('DOMContentLoaded', initCharts); } else { initCharts(); }
+</script>
+</body>
+</html>

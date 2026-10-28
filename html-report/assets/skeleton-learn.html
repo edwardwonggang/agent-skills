@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{TOPIC}} · 知识学习报告</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<style>
+  :root{
+    --navy:#294066; --ok:#276749; --warn:#8a5a12; --risk:#9b342a;
+    --muted:#5c6672; --ink:#1b2733; --line:#e4e2db;
+    --bg:#f7f6f3; --card:#ffffff; --accent:#2d6a9f;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--bg);line-height:1.75}
+  /* 顶部阅读进度条 */
+  #progress{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:999;transition:width .1s}
+  .layout{display:flex;max-width:1240px;margin:0 auto}
+  .toc{position:sticky;top:0;height:100vh;width:236px;flex:0 0 236px;background:#1f2c3d;color:#fff;padding:24px 18px;overflow-y:auto}
+  .toc h1{font-size:15px;margin:0 0 4px;line-height:1.45}
+  .toc .toc-sub{font-size:11.5px;color:#93a4bb;margin-bottom:18px}
+  .toc a{display:block;color:#d3dce8;text-decoration:none;padding:5px 8px;border-radius:6px;font-size:13px;margin-bottom:1px}
+  .toc a:hover{background:rgba(255,255,255,.10);color:#fff}
+  .toc a.active{background:var(--accent);color:#fff}
+  .main{flex:1;padding:32px 40px 100px;min-width:0}
+  /* 首屏结论卡 */
+  .hero{background:linear-gradient(135deg,#22314a,#2d6a9f);color:#fff;border-radius:14px;padding:28px 30px;margin-bottom:26px}
+  .hero .label{font-size:12px;letter-spacing:.08em;opacity:.75;text-transform:uppercase}
+  .hero h2{margin:8px 0 10px;font-size:24px;line-height:1.4}
+  .hero p{margin:0;font-size:15px;opacity:.92}
+  section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px 28px;margin-bottom:22px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  section h2.sec{display:flex;align-items:center;gap:10px;margin:0 0 16px;font-size:19px;border-bottom:2px solid var(--line);padding-bottom:10px}
+  section h2.sec .no{background:var(--accent);color:#fff;border-radius:6px;padding:2px 9px;font-size:13px}
+  section h3{margin:20px 0 8px;font-size:16px;color:var(--navy)}
+  p{margin:9px 0}
+  /* kv 参数卡 */
+  .kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:14px 0}
+  .kv-cell{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:#fbfcfd}
+  .kv-cell dt{font-size:11.5px;color:var(--muted)}
+  .kv-cell dd{font-size:15px;font-weight:600;margin:3px 0 0}
+  /* 类比卡 */
+  .analogy{border-left:4px solid #574a86;background:#f5f3fa;border-radius:6px;padding:12px 16px;margin:14px 0;font-size:14.5px}
+  .analogy .ana-label{font-weight:700;color:#574a86;margin-bottom:2px}
+  /* callout 语义块 */
+  .callout{border-left:4px solid var(--navy);background:#f2f5fa;padding:10px 14px;border-radius:6px;margin:12px 0;font-size:14px}
+  .callout .co-title{font-weight:700;color:var(--navy);margin-bottom:2px}
+  .callout--info{border-left-color:var(--navy);background:#f2f5fa}
+  .callout--ok{border-left-color:var(--ok);background:#eff7f1}
+  .callout--warn{border-left-color:var(--warn);background:#fdf9ef}
+  .callout--err{border-left-color:var(--risk);background:#fdf3f2}
+  /* 对照表 */
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+  th{background:#eef2f7;color:var(--navy);font-weight:600}
+  .wrong{color:var(--risk)} .right{color:var(--ok)}
+  /* 图 */
+  pre.mermaid{text-align:center;background:transparent;margin:14px 0}
+  pre.mermaid svg{display:block;margin:0 auto;max-width:100%;height:auto}
+  .chart{width:100%;height:300px;margin:14px 0}
+  .fig-caption{font-size:12px;color:var(--muted);text-align:center;margin:6px 0 16px}
+  /* ===== 交互演示区 ===== */
+  .demo{background:#0f1720;border-radius:10px;padding:18px;margin:16px 0;color:#d8e0ea}
+  .demo-title{font-size:13px;color:#7f8ea3;margin-bottom:12px}
+  .bus{position:relative;height:56px;margin:10px 0 18px}
+  .bus-line{position:absolute;top:26px;left:0;right:0;height:4px;background:#2c3a4d;border-radius:2px}
+  .bus-pulse{position:absolute;top:24px;height:8px;width:8px;border-radius:50%;background:#5ac8fa;box-shadow:0 0 10px #5ac8fa;left:0;opacity:0}
+  .bus-node{position:absolute;top:0;transform:translateX(-50%);text-align:center;font-size:11px;color:#9fb0c4}
+  .bus-node .dot{width:14px;height:14px;border-radius:50%;background:#3b4a5e;margin:0 auto 6px;border:2px solid #5a6c84;transition:background .2s,border-color .2s}
+  .bus-node.win .dot{background:#5ac8fa;border-color:#5ac8fa;box-shadow:0 0 12px rgba(90,200,250,.8)}
+  .demo-btn{background:#2d6a9f;color:#fff;border:0;border-radius:8px;padding:9px 18px;font-size:14px;cursor:pointer;font-family:inherit}
+  .demo-btn:hover{background:#255a88}
+  .demo-btn:disabled{opacity:.5;cursor:not-allowed}
+  .demo-log{margin-top:12px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.9;color:#9fb0c4;min-height:60px}
+  .demo-log .ok{color:#6fbf8f} .demo-log .wait{color:#e2b93d} .demo-log .err{color:#ef6a63}
+  /* ===== 自测题 ===== */
+  .quiz{border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin:14px 0;background:#fbfcfd}
+  .quiz .q{font-weight:600;margin-bottom:10px}
+  .quiz .opt{display:block;width:100%;text-align:left;background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin:7px 0;cursor:pointer;font-size:14px;font-family:inherit;color:var(--ink);transition:.15s}
+  .quiz .opt:hover{border-color:var(--accent);background:#f4f8fc}
+  .quiz .opt.correct{border-color:var(--ok);background:#eff7f1;color:var(--ok);font-weight:600}
+  .quiz .opt.wrong{border-color:var(--risk);background:#fdf3f2;color:var(--risk)}
+  .quiz .fb{display:none;margin-top:10px;font-size:13.5px;padding:10px 12px;border-radius:6px;background:#eef2f7}
+  .quiz .fb.show{display:block}
+  /* details */
+  details{border:1px solid var(--line);border-radius:8px;margin:12px 0;background:#fbfcfd}
+  details summary{cursor:pointer;padding:10px 14px;font-weight:600;color:var(--navy);font-size:14px}
+  details pre{background:#0f1720;color:#d8e0ea;padding:14px 16px;border-radius:0 0 8px 8px;overflow-x:auto;font-size:12.5px;margin:0;white-space:pre-wrap;word-break:break-word}
+  code{background:#eef2f7;padding:1px 5px;border-radius:4px;font-size:.92em}
+  abbr{border-bottom:1px dotted var(--muted);cursor:help;text-decoration:none}
+  @media(max-width:900px){
+    .layout{display:block}
+    .toc{position:static;height:auto;width:100%;flex:none;padding:14px 16px 10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+    .toc h1{font-size:14px;margin:0 8px 0 0;display:inline-block}
+    .toc .toc-sub{font-size:11px;display:inline-block;margin:0}
+    .toc a{display:inline-block;font-size:12px;padding:4px 9px;margin:0;background:rgba(255,255,255,.10);border-radius:12px}
+    .main{padding:16px 14px 60px}
+    section{padding:16px 14px}
+    .hero{padding:20px 18px} .hero h2{font-size:20px}
+    .chart{height:260px}
+    .kv{grid-template-columns:1fr 1fr}
+    table{display:block;overflow-x:auto;white-space:nowrap}
+  }
+</style>
+</head>
+<body>
+<div id="progress"></div>
+<div class="layout">
+  <nav class="toc">
+    <h1>{{TOPIC}}</h1>
+    <div class="toc-sub">{{SUBTITLE}} · 学习报告</div>
+    <a href="#sec-1">01 · 它是什么</a>
+    <a href="#sec-2">02 · 为什么需要它</a>
+    <a href="#sec-3">03 · 核心原理</a>
+    <a href="#sec-4">04 · 关键机制</a>
+    <a href="#sec-5">05 · 动手看一遍</a>
+    <a href="#sec-6">06 · 常见误区</a>
+    <a href="#sec-7">07 · 进阶与延伸</a>
+    <a href="#sec-8">08 · 自测</a>
+  </nav>
+  <main class="main">
+
+    <!-- triage: 1flow=use(原理流程); 2dataviz=use(时序/速率对比); 3graph=use(拓扑); 4timeline=use(帧时序); 5img=skip(纯讲解无需截图) -->
+
+    <!-- 首屏：先给结论 -->
+    <div class="hero">
+      <div class="label">{{TOPIC}}</div>
+      <h2>{{ONE_LINE_DEFINITION}}</h2>
+      <p>{{WHY_IT_MATTERS}}</p>
+    </div>
+
+    <section id="sec-1">
+      <h2 class="sec"><span class="no">01</span>它是什么</h2>
+      <p>{{WHAT_IS_IT_TEXT}}</p>
+      <dl class="kv">
+        <div class="kv-cell"><dt>{{KV1_KEY}}</dt><dd>{{KV1_VAL}}</dd></div>
+        <div class="kv-cell"><dt>{{KV2_KEY}}</dt><dd>{{KV2_VAL}}</dd></div>
+        <div class="kv-cell"><dt>{{KV3_KEY}}</dt><dd>{{KV3_VAL}}</dd></div>
+        <div class="kv-cell"><dt>{{KV4_KEY}}</dt><dd>{{KV4_VAL}}</dd></div>
+      </dl>
+      <div class="analogy"><div class="ana-label">一句话类比</div>{{ANALOGY}}</div>
+    </section>
+
+    <section id="sec-2">
+      <h2 class="sec"><span class="no">02</span>为什么需要它</h2>
+      <p>{{WHY_NEEDED_TEXT}}</p>
+      <table>
+        <tr><th>维度</th><th>没有它时</th><th>有了它之后</th></tr>
+        <tr><td>{{CMP_DIM_1}}</td><td class="wrong">{{CMP_BEFORE_1}}</td><td class="right">{{CMP_AFTER_1}}</td></tr>
+        <tr><td>{{CMP_DIM_2}}</td><td class="wrong">{{CMP_BEFORE_2}}</td><td class="right">{{CMP_AFTER_2}}</td></tr>
+      </table>
+    </section>
+
+    <section id="sec-3">
+      <h2 class="sec"><span class="no">03</span>核心原理</h2>
+      <p>{{CORE_PRINCIPLE_TEXT}}</p>
+      <pre class="mermaid">
+{{FLOW_MERMAID}}
+      </pre>
+      <div class="fig-caption">图：{{FLOW_CAPTION}}</div>
+      <pre class="mermaid">
+{{SEQUENCE_MERMAID}}
+      </pre>
+      <div class="fig-caption">图：{{SEQUENCE_CAPTION}}</div>
+    </section>
+
+    <section id="sec-4">
+      <h2 class="sec"><span class="no">04</span>关键机制</h2>
+      <h3>{{MECH1_TITLE}}</h3>
+      <p>{{MECH1_TEXT}}</p>
+      <div class="analogy"><div class="ana-label">类比</div>{{MECH1_ANALOGY}}</div>
+      <h3>{{MECH2_TITLE}}</h3>
+      <p>{{MECH2_TEXT}}</p>
+      <div id="chart1" class="chart"></div>
+      <div class="fig-caption">图：{{CHART_CAPTION}}</div>
+    </section>
+
+    <section id="sec-5">
+      <h2 class="sec"><span class="no">05</span>动手看一遍</h2>
+      <p>{{DEMO_INTRO}}</p>
+      <div class="demo">
+        <div class="demo-title">{{DEMO_TITLE}}</div>
+        <div class="bus" id="bus">
+          <div class="bus-line"></div>
+          <div class="bus-pulse" id="pulse"></div>
+          <div class="bus-node" style="left:12%"><div class="dot" id="n1"></div>节点 A</div>
+          <div class="bus-node" style="left:37%"><div class="dot" id="n2"></div>节点 B</div>
+          <div class="bus-node" style="left:62%"><div class="dot" id="n3"></div>节点 C</div>
+          <div class="bus-node" style="left:87%"><div class="dot" id="n4"></div>节点 D</div>
+        </div>
+        <button class="demo-btn" id="demoBtn">▶ 模拟一次总线通信</button>
+        <div class="demo-log" id="demoLog"></div>
+      </div>
+      <div class="fig-caption">图：交互演示（点击按钮触发）</div>
+    </section>
+
+    <section id="sec-6">
+      <h2 class="sec"><span class="no">06</span>常见误区</h2>
+      <table>
+        <tr><th>常见误解</th><th>实际情况</th></tr>
+        <tr><td class="wrong">{{MYTH_1}}</td><td class="right">{{TRUTH_1}}</td></tr>
+        <tr><td class="wrong">{{MYTH_2}}</td><td class="right">{{TRUTH_2}}</td></tr>
+      </table>
+    </section>
+
+    <section id="sec-7">
+      <h2 class="sec"><span class="no">07</span>进阶与延伸</h2>
+      <p>{{ADVANCED_TEXT}}</p>
+      <ul>
+        <li>{{NEXT_1}}</li>
+        <li>{{NEXT_2}}</li>
+      </ul>
+    </section>
+
+    <section id="sec-8">
+      <h2 class="sec"><span class="no">08</span>自测</h2>
+      <div class="quiz" data-answer="1">
+        <div class="q">{{QUIZ1_Q}}</div>
+        <button class="opt" data-i="0">{{QUIZ1_A}}</button>
+        <button class="opt" data-i="1">{{QUIZ1_B}}</button>
+        <button class="opt" data-i="2">{{QUIZ1_C}}</button>
+        <div class="fb" data-right="{{QUIZ1_RIGHT}}" data-wrong="{{QUIZ1_WRONG}}"></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+  mermaid.initialize({startOnLoad:true, theme:'base', securityLevel:'loose',
+    themeVariables:{primaryColor:'#e7eef7', primaryBorderColor:'#2d6a9f', primaryTextColor:'#1b2733',
+      lineColor:'#5c6672', edgeLabelBackground:'#ffffff'}});
+
+  // 阅读进度条
+  window.addEventListener('scroll', function(){
+    var h = document.documentElement.scrollHeight - window.innerHeight;
+    var p = h > 0 ? (window.scrollY / h) * 100 : 0;
+    document.getElementById('progress').style.width = p + '%';
+  });
+
+  // 目录高亮
+  var secs = [...document.querySelectorAll('section[id]')];
+  var links = [...document.querySelectorAll('.toc a')];
+  window.addEventListener('scroll', function(){
+    var cur = secs.filter(function(s){ return s.getBoundingClientRect().top <= 120; }).pop();
+    links.forEach(function(a){ a.classList.toggle('active', cur && a.getAttribute('href') === '#' + cur.id); });
+  });
+
+  // 小图（示例：速率 vs 距离）
+  function initCharts(){
+    var el = document.getElementById('chart1');
+    if(!el || typeof echarts === 'undefined') return;
+    var chart = echarts.init(el);
+    chart.setOption({
+      tooltip:{trigger:'axis'},
+      grid:{left:60,right:30,top:30,bottom:40},
+      xAxis:{type:'category', data: {{CHART_X}}},
+      yAxis:{type:'value', name: {{CHART_Y_NAME}}},
+      series:[{type:'bar', data: {{CHART_Y}}, itemStyle:{color:'#2d6a9f', borderRadius:[4,4,0,0]}}]
+    });
+    window.addEventListener('resize', function(){ chart.resize(); });
+  }
+
+  // 交互演示：总线仲裁模拟
+  (function(){
+    var btn = document.getElementById('demoBtn');
+    var log = document.getElementById('demoLog');
+    var pulse = document.getElementById('pulse');
+    if(!btn) return;
+    var nodes = ['n1','n2','n3','n4'];
+    var busRoot = document.getElementById('bus');
+    var names = ['节点 A','节点 B','节点 C','节点 D'];
+    btn.addEventListener('click', function(){
+      btn.disabled = true; log.innerHTML = '';
+      var winner = Math.floor(Math.random() * 4);
+      var seq = [
+        {t:0, cls:'wait', txt:'总线空闲，4 个节点同时准备发送'},
+        {t:600, cls:'wait', txt:'同时拉低总线 → 所有节点检测到冲突'},
+        {t:1400, cls:'', txt:'进入仲裁：ID 数值小（优先级高）的节点赢得总线'},
+        {t:2200, cls:'ok', txt: names[winner] + ' 赢得仲裁，开始发送数据帧'},
+        {t:3200, cls:'ok', txt:'其余 3 个节点退让，等待下一轮'}
+      ];
+      seq.forEach(function(s){
+        setTimeout(function(){
+          log.innerHTML += '<div class="' + s.cls + '">' + s.txt + '</div>';
+        }, s.t);
+      });
+      // 脉冲动画
+      pulse.style.transition = 'none'; pulse.style.opacity = 1; pulse.style.left = '0%';
+      setTimeout(function(){ pulse.style.transition = 'all 1.2s linear'; pulse.style.left = '92%'; }, 50);
+      setTimeout(function(){ pulse.style.opacity = 0; }, 1300);
+      // 高亮赢家
+      setTimeout(function(){
+        nodes.forEach(function(id, i){ document.getElementById(id).parentElement.classList.toggle('win', i === winner); });
+      }, 2200);
+      setTimeout(function(){
+        btn.disabled = false;
+        nodes.forEach(function(id){ document.getElementById(id).parentElement.classList.remove('win'); });
+      }, 4200);
+    });
+  })();
+
+  // 自测题
+  document.querySelectorAll('.quiz').forEach(function(q){
+    var ans = Number(q.dataset.answer);
+    var fb = q.querySelector('.fb');
+    q.querySelectorAll('.opt').forEach(function(o){
+      o.addEventListener('click', function(){
+        if(q.dataset.done) return;
+        q.dataset.done = '1';
+        var i = Number(o.dataset.i);
+        o.classList.add(i === ans ? 'correct' : 'wrong');
+        if(i !== ans) q.querySelectorAll('.opt')[ans].classList.add('correct');
+        fb.textContent = i === ans ? fb.dataset.right : fb.dataset.wrong;
+        fb.classList.add('show');
+      });
+    });
+  });
+
+  if(document.readyState === 'loading'){ document.addEventListener('DOMContentLoaded', initCharts); } else { initCharts(); }
+</script>
+</body>
+</html>
